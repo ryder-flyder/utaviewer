@@ -1,5 +1,7 @@
 # UtaViewer
 
+**Live site: https://ryder-flyder.github.io/utaviewer/**
+
 A browser tool that shows vocal synth project files on a piano roll, plays the pitch curve and lyrics back over the notes, and exports the result as a video. Everything runs locally in your browser; files are never uploaded.
 
 ## Supported files
@@ -27,10 +29,9 @@ Several UST files layer on one roll. Any other project replaces the one that is 
 
 ## Use it
 
-Open the site, add or drop project files, press play, then use the Export tab and Record video. Recording plays the project once in real time, so keep the tab in the foreground until it finishes.
+Open the [live site](https://ryder-flyder.github.io/utaviewer/), add or drop project files, press play, then use the Export tab and Record video. Recording plays the project once in real time, so keep the tab in the foreground until it finishes.
 
 To run it locally, open `index.html` in a browser, or serve the folder with any static server (`python3 -m http.server`).
-
 
 ## Libraries
 
