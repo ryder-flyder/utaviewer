@@ -139,3 +139,23 @@ body{padding:0;overflow:hidden}
   .wrap{height:auto}
   .win{height:auto;grid-template-rows:none}
 }
+
+/* 1.2 additions */
+.ver{font-size:11px;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:0 6px;line-height:18px}
+textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0;width:100%;resize:vertical;font:inherit;color:inherit}
+.seg{display:flex;gap:6px}
+.seg .btn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.rng{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:6px 8px;align-items:center}
+.prow{display:flex;gap:9px;align-items:center;padding:6px 0}
+.prow .th{width:38px;height:38px;border-radius:8px;border:1px solid var(--line);background:var(--bg) center/cover;flex:none}
+.prow .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec{font-weight:600}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);padding:18px 22px;max-width:380px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin:0 0 10px;font-size:16px}
+dialog dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
+dialog dt{font-weight:650;white-space:nowrap}
+dialog dd{margin:0;color:var(--mute)}
+.row.stack{grid-template-columns:minmax(0,1fr)}
+#lyrText{flex:none;min-height:120px}
+.pane .hint{margin:0}

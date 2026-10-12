@@ -16,13 +16,18 @@ Several UST files can stack on one roll. Any other project replaces the one that
 - Preset looks based on each program, with colors and effects you can change
 - Grid that follows the file's tempo
 - Optional auto-shift so the view follows the notes up and down
-- Video export, 1920x1080 at 60 fps by default (MP4 when your browser can do it, WebM if not)
+- Optional character portraits laid under the notes at an opacity you choose
+- Lyric box in a corner, from the notes' timings, your own text, or an .lrc file
+- Background image or video
+- Video export, 1920x1080 at 60 fps by default (MP4 when your browser can do it, WebM if not), with range and 16:9 / 9:16 / 1:1 shapes
+- Save and load a look as a small file
+- Keyboard shortcuts (press `?`)
 
 ## Using it
 
 Open the site, add your files, hit play, then go to Export and record. It records in real time, so keep the tab open until it's done.
 
-Want the Windows app? Grab `UtaViewer-win-x64.zip` from [Releases](https://github.com/ryder-flyder/utaviewer/releases), unzip it and run `UtaViewer.exe`.
+Want the Windows app? Grab the zip from [Releases](https://github.com/ryder-flyder/utaviewer/releases), unzip it and run `UtaViewer.exe`.
 
 To run the web version yourself, open `index.html` or serve the folder with any static server.
 

@@ -1,5 +1,6 @@
 (() => {
 'use strict';
+const VERSION = '1.2.0';
 const $ = (s, r = document) => r.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function h(tag, props, ...kids) {
@@ -60,6 +61,21 @@ const FXDEF = [
   { k: 'lyrics', t: 'toggle', l: 'Show lyrics' },
   { k: 'lyricMode', t: 'select', l: 'Placement', opts: [['auto', 'Inside, above when too narrow'], ['inside', 'Inside notes'], ['above', 'Above notes']] },
   { k: 'lyricSize', t: 'range', l: 'Lyric size', min: 50, max: 180, step: 5, u: '%' },
+  { sec: 'Lyric box' },
+  { k: 'lyrPos', t: 'select', l: 'Corner', opts: [['br', 'Bottom right'], ['bl', 'Bottom left'], ['bc', 'Bottom center'], ['tr', 'Top right'], ['tl', 'Top left']] },
+  { k: 'lyrSize', t: 'range', l: 'Size', min: 50, max: 220, step: 5, u: '%' },
+  { k: 'lyrKaraoke', t: 'toggle', l: 'Highlight each word as it is sung' },
+  { k: 'lyrBox', t: 'toggle', l: 'Dark panel behind the text' },
+  { k: 'lyrNext', t: 'toggle', l: 'Show the next line underneath' },
+  { sec: 'Portraits' },
+  { k: 'portShow', t: 'toggle', l: 'Show portraits' },
+  { k: 'portOpacity', t: 'range', l: 'Opacity', min: 5, max: 100, step: 1, u: '%' },
+  { k: 'portSize', t: 'range', l: 'Size (percent of the video height)', min: 30, max: 140, step: 1, u: '%' },
+  { k: 'portPos', t: 'select', l: 'Position', opts: [['r', 'Right'], ['c', 'Center'], ['l', 'Left']] },
+  { k: 'portReact', t: 'toggle', l: 'Brighten while the track sings' },
+  { sec: 'Background' },
+  { k: 'bgDim', t: 'range', l: 'Dim', min: 0, max: 95, step: 1, u: '%' },
+  { k: 'bgBlur', t: 'range', l: 'Blur', min: 0, max: 24, step: 1, u: 'px' },
   { sec: 'Notes and rows' },
   { k: 'noteH', t: 'range', l: 'Note height', min: 40, max: 100, step: 1, u: '%' },
   { k: 'round', t: 'range', l: 'Corner rounding', min: 0, max: 50, step: 1, u: '%' },
@@ -78,9 +94,9 @@ const FXDEF = [
   { k: 'keys', t: 'toggle', l: 'Piano keys' },
   { k: 'grid', t: 'toggle', l: 'Grid lines' }
 ];
-const FX0 = { highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true };
+const FX0 = { highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0 };
 const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
-const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16' };
+const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', lyricText: '', lyrTrack: 'auto' };
 let fx = { ...FX0 }, look = { ...LOOK0 };
 try { const s = JSON.parse(localStorage.getItem('utaviewer.v2') || 'null'); if (s) { Object.assign(fx, s.fx || {}); Object.assign(look, s.look || {}); if (look.size === '1280x720' && look.fps === '30' && look.mbps === '8') Object.assign(look, { size: LOOK0.size, fps: LOOK0.fps, mbps: LOOK0.mbps }); } } catch (e) {}
 if (look.mine) PRESETS['My theme'] = look.mine; else PRESETS['My theme'] = Object.assign({}, PRESETS.Default, { g: 'Yours', fx: {} });
@@ -88,7 +104,7 @@ if (!PRESETS[look.preset]) look.preset = 'Default';
 if (!look.colors) look.colors = {};
 const save = () => { try { localStorage.setItem('utaviewer.v2', JSON.stringify({ fx, look })); } catch (e) {} };
 
-const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0 };
+const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], linesDirty: true };
 const cv = $('#cv'), ctx = cv.getContext('2d');
 
 // status
@@ -112,6 +128,7 @@ function recalc() {
   while (hi - lo < 11) { hi++; if (hi - lo < 11) lo--; }
   S.range = { lo, hi };
   $('#tEnd').textContent = fmt(S.duration);
+  S.linesDirty = true; refreshLines(); renderVis();
 }
 const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 
@@ -175,12 +192,13 @@ async function play() {
   await ensureCtx();
   if (S.time >= S.duration - 0.05) S.time = 0;
   S.playing = true; S.c0 = S.ctx.currentTime; S.t0 = S.time; S.prevT = S.time;
-  restartAudio(); setPlayIcon();
+  restartAudio(); setPlayIcon(); bgSync();
 }
-function pause() { if (!S.playing) return; S.playing = false; stopSrc(); setPlayIcon(); }
+function pause() { if (!S.playing) return; S.playing = false; stopSrc(); setPlayIcon(); bgSync(); }
 function seek(t) {
   S.time = clamp(t, 0, S.duration); S.prevT = S.time; S.parts.length = 0;
   if (S.playing) { S.c0 = S.ctx.currentTime; S.t0 = S.time; restartAudio(); }
+  bgSync(true);
 }
 function setPlayIcon() {
   $('#playIcon').innerHTML = S.playing ? '<path d="M3 1.5h3.4v13H3zM9.6 1.5H13v13H9.6z"/>' : '<path d="M3 1.5v13l11-6.5z"/>';
@@ -190,12 +208,23 @@ $('#play').addEventListener('click', () => S.playing ? pause() : play());
 $('#toStart').addEventListener('click', () => seek(0));
 $('#btnExport').addEventListener('click', () => { const b = document.querySelector('.tabs button[data-tab="exp"]'); if (b) b.click(); });
 window.addEventListener('keydown', e => {
-  if (e.target.closest && e.target.closest('input,select,textarea,button')) return;
+  if (e.target.closest && e.target.closest('input,select,textarea,button,dialog')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
   if (e.code === 'Space') { e.preventDefault(); S.playing ? pause() : play(); }
   else if (e.code === 'Home') seek(0);
-  else if (e.code === 'ArrowRight') seek(S.time + 2);
-  else if (e.code === 'ArrowLeft') seek(S.time - 2);
+  else if (e.code === 'End') seek(S.duration);
+  else if (e.code === 'ArrowRight') seek(S.time + (e.shiftKey ? 10 : 2));
+  else if (e.code === 'ArrowLeft') seek(S.time - (e.shiftKey ? 10 : 2));
+  else if (k === '+' || k === '=') nudgeWindow(-1);
+  else if (k === '-' || k === '_') nudgeWindow(1);
+  else if (k === 'f' || k === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else if ($('#screen').requestFullscreen) $('#screen').requestFullscreen().catch(() => {}); }
+  else if (k === 'l' || k === 'L') { fx.lyrShow = !fx.lyrShow; syncVisInputs(); save(); msg('Lyric box ' + (fx.lyrShow ? 'on.' : 'off.')); }
+  else if (k === '?' || k === '/') { $('#help').showModal(); }
+  else if (/^[1-5]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
 });
+function nudgeWindow(dir) { fx.window = clamp(Math.round(fx.window * (dir > 0 ? 1.25 : 0.8) * 2) / 2, 2, 24); syncControl('window'); save(); msg('Time window ' + fx.window + ' s'); }
+$('#btnHelp').addEventListener('click', () => $('#help').showModal());
 
 // drawing
 const FONT = '"Instrument Sans","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
@@ -255,6 +284,7 @@ function draw(T) {
   ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, P.bg1); g.addColorStop(1, P.bg2);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  drawBg(W, H, P);
   const tm = S.tm, bph = tm ? (((tm.s2t(T) / tm.res) % 1) + 1) % 1 : 0, pulse = fx.pulse && S.playing ? Math.exp(-bph * 6) : 0;
 
   ctx.save(); ctx.beginPath(); ctx.rect(keysW, 0, W - keysW, H); ctx.clip();
@@ -264,7 +294,7 @@ function draw(T) {
       const pc = ((p % 12) + 12) % 12, blk = BLACK[pc];
       let c, a;
       if (tint) { c = P.rows[pc]; a = P.rowTintA == null ? 1 : P.rowTintA; } else if (blk) { c = P.rowB; a = P.rowBA; } else { c = P.rowW; a = P.rowWA; }
-      if (c && a > 0) { ctx.globalAlpha = a; ctx.fillStyle = c; ctx.fillRect(keysW, (hi - p) * rowH, W - keysW, rowH + 0.6); }
+      if (c && a > 0) { ctx.globalAlpha = a * (S.bg ? 0.55 : 1); ctx.fillStyle = c; ctx.fillRect(keysW, (hi - p) * rowH, W - keysW, rowH + 0.6); }
     }
     ctx.globalAlpha = 1;
   }
@@ -288,6 +318,7 @@ function draw(T) {
     }
   }
 
+  drawPortraits(W, H, keysW, P);
   const act = [], jobs = [], gl = fx.glow * sc, nh = rowH * fx.noteH / 100, rad = nh * fx.round / 100;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const { f, t } of allTracks()) {
@@ -390,6 +421,7 @@ function draw(T) {
   }
   if (!S.files.length) { ctx.font = `600 ${22 * sc}px ${FONT}`; ctx.fillStyle = P.fg; ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Drop project files here', W / 2, H / 2); ctx.textAlign = 'left'; ctx.globalAlpha = 1; }
   if (look.caption) { ctx.font = `650 ${22 * sc}px ${FONT}`; ctx.fillStyle = P.fg; ctx.globalAlpha = 0.9; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(look.caption, keysW + 22 * sc, 18 * sc); ctx.globalAlpha = 1; }
+  drawLyricBox(W, H, sc, keysW, P, T);
 }
 
 function stepParticles(dt) {
@@ -508,8 +540,9 @@ function loop(ts) {
   const dt = clamp((ts - (S.last || ts)) / 1000, 0, 0.1); S.last = ts;
   if (S.playing && S.ctx) {
     S.time = S.t0 + (S.ctx.currentTime - S.c0);
-    if (S.time >= S.duration) {
-      S.time = S.duration; pause();
+    const lim = S.exporting && S.exporting.to != null ? S.exporting.to : S.duration;
+    if (S.time >= lim) {
+      S.time = lim; pause();
       if (S.exporting) finishExport();
     }
     S.prevT = S.time;
@@ -518,7 +551,7 @@ function loop(ts) {
   draw(S.time);
   const tx = fmt(S.time); if (tx !== lastTxt) { $('#tNow').textContent = tx; lastTxt = tx; }
   updateTL(); { const ti = S.files.map(f => f.name).join(', ') + bpmText(); if (ti !== lastInfo) { lastInfo = ti; $('#tcInfo').textContent = ti; } }
-  if (S.exporting) { const k = clamp(S.time / S.duration, 0, 1); $('#recBar').style.width = (k * 100).toFixed(1) + '%'; $('#recText').textContent = 'Recording ' + Math.round(k * 100) + '%  (' + fmt(S.time) + ' of ' + fmt(S.duration) + ')'; }
+  if (S.exporting) { const x = S.exporting, k = clamp((S.time - x.from) / Math.max(0.1, x.to - x.from), 0, 1); $('#recBar').style.width = (k * 100).toFixed(1) + '%'; $('#recText').textContent = 'Recording ' + Math.round(k * 100) + '%  (' + fmt(S.time - x.from) + ' of ' + fmt(x.to - x.from) + ')'; }
   requestAnimationFrame(loop);
 }
 
@@ -578,7 +611,7 @@ function buildFx() {
     }
     box.append(el);
   }
-  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); save(); recalc(); } }, 'Reset effects'));
+  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); syncVisInputs(); save(); recalc(); } }, 'Reset effects'));
 }
 const COLORDEF = [['bg1', 'Background top'], ['bg2', 'Background bottom'], ['rowW', 'Row, white key'], ['rowB', 'Row, black key'], ['grid', 'Grid lines'], ['keyW', 'Key, white'], ['keyB', 'Key, black'], ['play', 'Playhead'], ['pitch', 'Pitch curve'], ['act', 'Active outline'], ['edge', 'Note outline'], ['fg', 'Text']];
 const colorRefs = {}, palRefs = [];
@@ -661,6 +694,9 @@ async function startExport() {
   if (S.exporting) return;
   if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record the canvas. Try a current Chrome, Edge or Safari.', 'err'); return; }
   const mime = pickMime(); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return; }
+  const from = clamp(parseFloat($('#expFrom').value) || 0, 0, S.duration);
+  const toRaw = parseFloat($('#expTo').value), to = isFinite(toRaw) ? clamp(toRaw, 0, S.duration) : S.duration;
+  if (to - from < 0.5) { msg('The end of the range has to be at least half a second after the start.', 'err'); return; }
   pause(); await ensureCtx(); S.parts.length = 0;
   const stream = cv.captureStream(parseInt(look.fps, 10));
   S.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
@@ -668,8 +704,8 @@ async function startExport() {
   const chunks = [], type = mime.split(';')[0];
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec.onstop = () => { const ex = S.exporting; S.exporting = null; $('#recState').hidden = true; $('#rec').disabled = false; if (ex && !ex.cancel) showResult(new Blob(chunks, { type }), type.includes('mp4') ? 'mp4' : 'webm'); };
-  S.exporting = { rec, cancel: false }; $('#rec').disabled = true; $('#recState').hidden = false; $('#result').hidden = true;
-  seek(0); rec.start(250); await play(); msg('');
+  S.exporting = { rec, cancel: false, from, to }; $('#rec').disabled = true; $('#recState').hidden = false; $('#result').hidden = true;
+  seek(from); rec.start(250); await play(); msg('');
 }
 function finishExport() { const ex = S.exporting; if (ex) setTimeout(() => { try { ex.rec.stop(); } catch (e) {} }, 400); }
 $('#rec').addEventListener('click', startExport);
@@ -693,8 +729,225 @@ $('#resSave').addEventListener('click', async () => {
   catch (e) { if (e && e.code === 'declined') return; msg('The file could not be saved (' + (e && e.code || 'error') + ').', 'err'); }
 });
 
+// ---- 1.2: background, portraits, lyric box, look files ----
+function readAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); }); }
+function imgFromSrc(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('image')); i.src = src; }); }
+// shrink big images so the look file and memory stay small
+async function shrink(src, max, type, q) {
+  const img = await imgFromSrc(src), k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  if (k === 1 && src.length < 400000) return { data: src, img };
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const data = c.toDataURL(type, q); return { data, img: await imgFromSrc(data) };
+}
+async function setPortrait(name, file) {
+  try { const p = await shrink(await readAsDataURL(file), 1024, 'image/png'); S.ports.set(name, p); renderVis(); msg('Portrait set for ' + name + '.' + (fx.portShow ? '' : ' Tick Show portraits to see it.'), 'ok'); }
+  catch (e) { msg('That image could not be read.', 'err'); }
+}
+function pickPortrait(name) {
+  const inp = $('#filePort'); inp.onchange = () => { if (inp.files[0]) setPortrait(name, inp.files[0]); inp.value = ''; }; inp.click();
+}
+function clearBg() { if (S.bg && S.bg.url) URL.revokeObjectURL(S.bg.url); S.bg = null; renderVis(); }
+async function setBg(file) {
+  try {
+    if (file.type.startsWith('video/')) {
+      const url = URL.createObjectURL(file), v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+      await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error('video')); });
+      if (S.bg && S.bg.url) URL.revokeObjectURL(S.bg.url);
+      S.bg = { kind: 'video', el: v, url, name: file.name }; bgSync(true);
+    } else {
+      const p = await shrink(await readAsDataURL(file), 1920, 'image/jpeg', 0.86);
+      if (S.bg && S.bg.url) URL.revokeObjectURL(S.bg.url);
+      S.bg = { kind: 'image', el: p.img, data: p.data, name: file.name };
+    }
+    renderVis(); msg('Background set.', 'ok');
+  } catch (e) { msg('That background file could not be opened.', 'err'); }
+}
+function bgSync(jump) {
+  const b = S.bg; if (!b || b.kind !== 'video') return;
+  const v = b.el;
+  if (jump && v.duration) { try { v.currentTime = S.time % v.duration; } catch (e) {} }
+  if (S.playing) v.play().catch(() => {}); else v.pause();
+}
+function drawBg(W, H, P) {
+  const b = S.bg; if (!b) return;
+  const el = b.el, v = b.kind === 'video', iw = v ? el.videoWidth : el.naturalWidth, ih = v ? el.videoHeight : el.naturalHeight;
+  if (!iw || !ih || (v && el.readyState < 2)) return;
+  const k = Math.max(W / iw, H / ih), blur = fx.bgBlur * Math.min(W, H) / 720, m = blur * 2;
+  if (blur > 0) ctx.filter = 'blur(' + blur + 'px)';
+  ctx.drawImage(el, (W - iw * k) / 2 - m, (H - ih * k) / 2 - m, iw * k + 2 * m, ih * k + 2 * m);
+  ctx.filter = 'none';
+  ctx.globalAlpha = fx.bgDim / 100; ctx.fillStyle = css(hex2rgb(P.bg1)); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+}
+
+// portraits are laid under the notes, full height, at the chosen opacity. Several tracks share the width.
+function drawPortraits(W, H, keysW, P) {
+  if (!fx.portShow || !S.ports.size) return;
+  const list = [];
+  for (const { t } of allTracks()) { const p = S.ports.get(t.name); if (t.on && p && !list.some(x => x.p === p)) list.push({ t, p }); }
+  if (!list.length) return;
+  const dt = S.dt || 0.016, left = keysW, span = W - keysW, n = list.length, hh = H * fx.portSize / 100;
+  ctx.save(); ctx.beginPath(); ctx.rect(left, 0, span, H); ctx.clip();
+  list.forEach((it, i) => {
+    const t = it.t, on = S.act && S.act.some(a => a.t === t), im = it.p.img;
+    t._pa = (t._pa || 0) + ((on ? 1 : 0) - (t._pa || 0)) * (1 - Math.exp(-dt * (on ? 14 : 5)));
+    const w = hh * im.naturalWidth / im.naturalHeight, slot = span / n;
+    const cx = n > 1 ? left + slot * (i + 0.5) : fx.portPos === 'l' ? left + w / 2 + span * 0.04 : fx.portPos === 'c' ? left + span / 2 : W - w / 2 - span * 0.04;
+    ctx.globalAlpha = clamp(fx.portOpacity / 100 * (fx.portReact ? 0.7 + 0.6 * t._pa : 1), 0, 1);
+    ctx.drawImage(im, cx - w / 2, H - hh, w, hh);
+  });
+  ctx.restore();
+}
+
+// lyric lines are rebuilt only when something they depend on changes
+function lyricTrack() {
+  const on = allTracks().filter(x => x.t.on), sel = look.lyrTrack;
+  if (sel && sel !== 'auto') { const [fi, ti] = sel.split(':').map(Number), f = S.files[fi], t = f && f.tracks[ti]; if (t && t.on) return { f, t }; }
+  let best = null, bc = 0;
+  for (const x of on) { const c = UVLyrics.lyricCount(x.t); if (c > bc) { bc = c; best = x; } }
+  return best;
+}
+function refreshLines() {
+  const src = lyricTrack(), ph = src ? UVLyrics.phrases(src.t, src.f.offset / 1000) : [];
+  S.lines = UVLyrics.buildLines(fx.lyrSrc, ph, look.lyricText || '', S.duration); S.linesDirty = false;
+  const info = $('#lyrInfo'); if (!info) return;
+  const rows = (look.lyricText || '').split(/\r?\n/).filter(x => x.trim()).length;
+  if (fx.lyrSrc === 'notes') info.textContent = ph.length ? ph.length + ' phrases found in the notes.' : 'No lyrics found in the loaded notes.';
+  else if (UVLyrics.parseLRC(look.lyricText || '').length) info.textContent = S.lines.length + ' timed lines (LRC timestamps in use).';
+  else if (fx.lyrSrc === 'text') info.textContent = rows + ' text lines, ' + ph.length + ' note phrases.' + (rows > ph.length ? ' Lines past the last phrase are not shown.' : '');
+  else info.textContent = rows + ' text lines spread over ' + fmt(S.duration) + '.';
+}
+function drawLyricBox(W, H, sc, keysW, P, T) {
+  if (!fx.lyrShow || !S.lines.length) return;
+  const cur = UVLyrics.current(S.lines, T); if (!cur || cur.alpha <= 0.01) return;
+  const L = cur.line, mg = Math.max(14 * sc, H * 0.025), fs = 28 * sc * fx.lyrSize / 100, maxW = Math.min(W * 0.42, W - keysW - 2 * mg);
+  ctx.save(); ctx.font = '650 ' + fs + 'px ' + FONT; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const spW = L.join ? ctx.measureText(L.join).width : 0, rows = []; let row = { items: [], w: 0 };
+  for (const tk of L.tokens) {
+    const tw = ctx.measureText(tk.text).width;
+    if (row.items.length && row.w + spW + tw > maxW && rows.length < 2) { rows.push(row); row = { items: [], w: 0 }; }
+    row.w += (row.items.length ? spW : 0) + tw; row.items.push({ tk, tw });
+  }
+  rows.push(row);
+  const wid = Math.max(...rows.map(r => r.w)), k = Math.min(1, maxW / wid), lh = fs * 1.3, padX = 18 * sc, padY = 12 * sc;
+  const nextTxt = fx.lyrNext && cur.next ? cur.next.tokens.map(t => t.text).join(cur.next.join) : '';
+  const bw = wid * k + padX * 2, bh = (rows.length * lh + (nextTxt ? lh * 0.8 : 0)) * k + padY * 2;
+  const left = fx.lyrPos === 'bl' || fx.lyrPos === 'tl', center = fx.lyrPos === 'bc', top = fx.lyrPos === 'tl' || fx.lyrPos === 'tr';
+  const x = center ? (W + keysW - bw) / 2 : left ? keysW + mg : W - mg - bw;
+  const capOff = top && left && look.caption ? 44 * sc : 0;
+  const y = top ? mg + capOff : H - mg - bh;
+  ctx.globalAlpha = cur.alpha;
+  if (fx.lyrBox) { ctx.fillStyle = css(hex2rgb(P.bg1), 0.8); rr(x, y, bw, bh, 14 * sc); ctx.fill(); ctx.strokeStyle = css(hex2rgb(P.grid), 0.4); ctx.lineWidth = Math.max(1, sc); ctx.stroke(); }
+  else { ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 8 * sc; }
+  ctx.translate(x + padX, y + padY); ctx.scale(k, k);
+  const sung = css(hex2rgb(P.act || P.hi)), idle = P.fg;
+  rows.forEach((r, ri) => {
+    let px = 0; const cy = (ri + 0.5) * lh;
+    r.items.forEach((it, ii) => {
+      if (ii) px += spW;
+      ctx.fillStyle = !fx.lyrKaraoke || T >= it.tk.t ? (fx.lyrKaraoke ? sung : idle) : idle;
+      ctx.globalAlpha = cur.alpha * (fx.lyrKaraoke && T < it.tk.t ? 0.62 : 1);
+      ctx.fillText(it.tk.text, px, cy); px += it.tw;
+    });
+  });
+  if (nextTxt) { ctx.font = '600 ' + fs * 0.7 + 'px ' + FONT; ctx.globalAlpha = cur.alpha * 0.5; ctx.fillStyle = idle; ctx.fillText(fitText(nextTxt, wid), 0, rows.length * lh + lh * 0.4); }
+  ctx.restore();
+}
+
+// visuals tab
+function renderVis() {
+  const box = $('#portList'); if (!box) return;
+  box.replaceChildren();
+  const names = []; for (const { t } of allTracks()) if (!names.includes(t.name)) names.push(t.name);
+  if (!names.length) box.append(h('div', { class: 'empty' }, 'Load a project to add portraits for its tracks.'));
+  for (const n of names) {
+    const p = S.ports.get(n);
+    box.append(h('div', { class: 'prow' }, h('div', { class: 'th', style: p ? 'background-image:url(' + p.data + ')' : null }), h('span', { class: 'tn', title: n }, n),
+      h('button', { class: 'btn small', type: 'button', onclick: () => pickPortrait(n) }, p ? 'Change' : 'Choose'),
+      p ? h('button', { class: 'btn small', type: 'button', onclick: () => { S.ports.delete(n); renderVis(); } }, 'Clear') : null));
+  }
+  const bg = $('#bgBox'); bg.replaceChildren();
+  bg.append(h('div', { class: 'prow' }, h('span', { class: 'tn', title: S.bg ? S.bg.name : '' }, S.bg ? S.bg.name : 'No background'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => { $('#fileBg').click(); } }, S.bg ? 'Change' : 'Choose image or video'),
+    S.bg ? h('button', { class: 'btn small', type: 'button', onclick: clearBg }, 'Clear') : null));
+  const sel = $('#lyrTrack'); sel.replaceChildren(h('option', { value: 'auto' }, 'Auto (most lyrics)'));
+  S.files.forEach((f, fi) => f.tracks.forEach((t, ti) => sel.append(h('option', { value: fi + ':' + ti }, t.name + (S.files.length > 1 ? ' (' + f.name + ')' : '')))));
+  sel.value = [...sel.options].some(o => o.value === look.lyrTrack) ? look.lyrTrack : 'auto';
+  $('#lyrTrack').disabled = !S.files.length;
+}
+function syncVisInputs() { $('#portShow').checked = !!fx.portShow; $('#lyrShow').checked = !!fx.lyrShow; $('#lyrSrc').value = fx.lyrSrc; $('#lyrText').value = look.lyricText || ''; }
+$('#fileBg').addEventListener('change', e => { if (e.target.files[0]) setBg(e.target.files[0]); e.target.value = ''; });
+$('#portShow').addEventListener('change', e => { fx.portShow = e.target.checked; save(); });
+$('#lyrShow').addEventListener('change', e => { fx.lyrShow = e.target.checked; save(); });
+$('#lyrSrc').addEventListener('change', e => { fx.lyrSrc = e.target.value; save(); refreshLines(); });
+$('#lyrTrack').addEventListener('change', e => { look.lyrTrack = e.target.value; save(); refreshLines(); });
+$('#lyrText').addEventListener('input', e => { look.lyricText = e.target.value; save(); refreshLines(); });
+$('#lyrClear').addEventListener('click', () => { look.lyricText = ''; $('#lyrText').value = ''; save(); refreshLines(); });
+$('#lyrFile').addEventListener('click', () => $('#fileLyr').click());
+$('#fileLyr').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  look.lyricText = (await f.text()).replace(/^﻿/, ''); $('#lyrText').value = look.lyricText;
+  if (fx.lyrSrc === 'notes') { fx.lyrSrc = UVLyrics.parseLRC(look.lyricText).length ? 'even' : 'text'; $('#lyrSrc').value = fx.lyrSrc; }
+  fx.lyrShow = true; syncVisInputs(); save(); refreshLines(); msg('Lyrics loaded from ' + f.name + '.', 'ok');
+});
+
+// export shape and range
+function syncAspect() { document.querySelectorAll('#aspect button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === look.size))); }
+document.querySelectorAll('#aspect button').forEach(b => b.addEventListener('click', () => { look.size = b.dataset.size; $('#size').value = look.size; setSize(); save(); syncAspect(); }));
+$('#size').addEventListener('change', syncAspect);
+$('#fromHere').addEventListener('click', () => { $('#expFrom').value = S.time.toFixed(1); });
+$('#toHere').addEventListener('click', () => { $('#expTo').value = S.time.toFixed(1); });
+
+// look files
+function saveBlobAs(blob, name) {
+  if (S.dl) return S.dl.save({ filename: name, data: blob });
+  const a = h('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000); return Promise.resolve();
+}
+$('#lookSave').addEventListener('click', async () => {
+  const ports = {}; for (const [n, p] of S.ports) ports[n] = p.data;
+  const keep = {}; for (const k of ['preset', 'colors', 'palette', 'mine', 'caption', 'size', 'fps', 'mbps', 'lyricText']) keep[k] = look[k];
+  const doc = { utaviewer: 'look', version: VERSION, fx, look: keep, portraits: ports, background: S.bg && S.bg.kind === 'image' ? S.bg.data : null };
+  try { await saveBlobAs(new Blob([JSON.stringify(doc)], { type: 'application/json' }), 'utaviewer-look.json'); msg('Look saved.' + (S.bg && S.bg.kind === 'video' ? ' Background videos are not included.' : ''), 'ok'); }
+  catch (e) { if (!(e && e.code === 'declined')) msg('The look file could not be saved.', 'err'); }
+});
+$('#lookLoad').addEventListener('click', () => $('#fileLook').click());
+$('#fileLook').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text()); if (d.utaviewer !== 'look') throw new Error('not a look file');
+    for (const k in FX0) if (d.fx && d.fx[k] !== undefined && typeof d.fx[k] === typeof FX0[k]) fx[k] = d.fx[k];
+    const l = d.look || {};
+    for (const k of ['preset', 'colors', 'palette', 'mine', 'caption', 'size', 'fps', 'mbps', 'lyricText']) if (l[k] !== undefined) look[k] = l[k];
+    if (look.mine) PRESETS['My theme'] = look.mine;
+    if (!PRESETS[look.preset]) look.preset = 'Default';
+    S.ports.clear();
+    for (const n in d.portraits || {}) { try { S.ports.set(n, { data: d.portraits[n], img: await imgFromSrc(d.portraits[n]) }); } catch (er) {} }
+    clearBg();
+    if (d.background) { try { S.bg = { kind: 'image', el: await imgFromSrc(d.background), data: d.background, name: 'Background from look file' }; } catch (er) {} }
+    updateP(); for (const k in ctrlRefs) syncControl(k);
+    syncColorInputs(); buildPresets(); recolorTracks(); setSize(); syncAspect(); syncVisInputs();
+    $('#size').value = look.size; $('#fps').value = look.fps; $('#mbps').value = look.mbps; $('#caption').value = look.caption || '';
+    save(); recalc(); msg('Look loaded from ' + f.name + '.', 'ok');
+  } catch (er) { msg('That is not a UtaViewer look file.', 'err'); }
+});
+
+// light / dark: follows the system until you pick one
+const THEMES = ['auto', 'light', 'dark'];
+let theme = 'auto'; try { theme = localStorage.getItem('utaviewer.theme') || 'auto'; } catch (e) {}
+if (!THEMES.includes(theme)) theme = 'auto';
+function applyTheme() {
+  if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
+  $('#btnTheme').textContent = 'Theme: ' + theme[0].toUpperCase() + theme.slice(1);
+  try { localStorage.setItem('utaviewer.theme', theme); } catch (e) {}
+}
+$('#btnTheme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(); });
+applyTheme();
+
 // init
-updateP(); setSize(); buildFx(); buildColorUI(); buildPresets(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); $('#autoStyle').checked = !!look.auto;
+$('#ver').textContent = 'v' + VERSION;
+updateP(); setSize(); buildFx(); buildColorUI(); buildPresets(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); $('#autoStyle').checked = !!look.auto;
 msg('Add project files or drop them on the preview to begin. Only UST files layer together.');
 try { const p = window.claude && window.claude.use ? window.claude.use('downloads') : null; if (p) p.then(d => { S.dl = d; }).catch(() => {}); } catch (e) {}
 requestAnimationFrame(loop);

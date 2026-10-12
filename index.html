@@ -10,18 +10,25 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..650&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem("utaviewer.theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
  <div class="win">
   <header class="top">
-    <div class="brand"><svg class="logo" viewBox="0 0 32 32" width="30" height="30" role="img" aria-label="UtaViewer logo"><rect width="32" height="32" rx="7" fill="var(--accent)"/><rect x="6" y="9" width="10" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="12" y="15" width="14" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="8" y="21" width="8" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="21" y="9" width="5" height="4" rx="1.5" fill="var(--accent-fg)" opacity=".55"/></svg><h1>UtaViewer</h1></div>
+    <div class="brand"><svg class="logo" viewBox="0 0 32 32" width="30" height="30" role="img" aria-label="UtaViewer logo"><rect width="32" height="32" rx="7" fill="var(--accent)"/><rect x="6" y="9" width="10" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="12" y="15" width="14" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="8" y="21" width="8" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="21" y="9" width="5" height="4" rx="1.5" fill="var(--accent-fg)" opacity=".55"/></svg><h1>UtaViewer</h1><span class="ver" id="ver" title="Version"></span></div>
     <div class="actions">
       <button class="btn" id="btnProj" type="button">Add project files</button>
       <button class="btn" id="btnAudio" type="button">Add audio</button>
+      <button class="btn" id="btnTheme" type="button" title="Switch between automatic, light and dark">Theme: Auto</button>
+      <button class="btn" id="btnHelp" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
       <button class="btn primary" id="btnExport" type="button">Export</button>
       <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsqx,.vpr,.svp,.ccs,.tssln">
       <input id="fileAudio" type="file" hidden accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a">
+      <input id="filePort" type="file" hidden accept="image/*">
+      <input id="fileBg" type="file" hidden accept="image/*,video/*">
+      <input id="fileLyr" type="file" hidden accept=".txt,.lrc,text/plain">
+      <input id="fileLook" type="file" hidden accept=".json,application/json">
     </div>
   </header>
 
@@ -30,6 +37,7 @@
         <button role="tab" aria-selected="true" data-tab="proj" type="button">Projects</button>
         <button role="tab" aria-selected="false" data-tab="fx" type="button">Effects</button>
         <button role="tab" aria-selected="false" data-tab="look" type="button">Look</button>
+        <button role="tab" aria-selected="false" data-tab="vis" type="button">Visuals</button>
         <button role="tab" aria-selected="false" data-tab="exp" type="button">Export</button>
       </div>
 
@@ -63,9 +71,51 @@
             <option value="1080x1080">1080 × 1080 (square)</option>
           </select></div>
         <div class="row"><label for="caption">Caption</label><input id="caption" type="text" maxlength="80" placeholder="Song title, shown top left"></div>
+        <div class="sec">Share this look</div>
+        <p class="hint">Saves colors, effects, portraits and the background image to a small file you can load later or send to someone.</p>
+        <div class="btns">
+          <button class="btn small" id="lookSave" type="button">Save look file</button>
+          <button class="btn small" id="lookLoad" type="button">Load look file</button>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="vis" hidden>
+        <div class="sec">Portraits</div>
+        <p class="hint">One image per track, laid under the notes. Opacity, size and position are in Effects. Turn them on below.</p>
+        <label class="chk" for="portShow"><input type="checkbox" id="portShow"><span>Show portraits</span></label>
+        <div id="portList"></div>
+        <div class="sec">Background</div>
+        <div id="bgBox"></div>
+        <p class="hint">Dim and blur are in Effects.</p>
+        <div class="sec">Lyric box</div>
+        <div class="row stack"><label for="lyrSrc">Lyrics come from</label>
+          <select id="lyrSrc">
+            <option value="notes">The notes in the project</option>
+            <option value="text">Text below, following the note phrases</option>
+            <option value="even">Text below, spread evenly over the song</option>
+          </select></div>
+        <div class="row stack"><label for="lyrTrack">Track</label><select id="lyrTrack"></select></div>
+        <textarea id="lyrText" rows="7" spellcheck="false" placeholder="One line per phrase. Lines that start with [mm:ss.xx] are timed exactly (LRC)."></textarea>
+        <div class="btns">
+          <button class="btn small" id="lyrFile" type="button">Load .txt / .lrc</button>
+          <button class="btn small" id="lyrClear" type="button">Clear text</button>
+        </div>
+        <label class="chk" for="lyrShow"><input type="checkbox" id="lyrShow"><span>Show the lyric box</span></label>
+        <p class="hint" id="lyrInfo"></p>
       </div>
 
       <div class="pane" data-pane="exp" hidden>
+        <div class="sec">Shape</div>
+        <div class="seg" id="aspect">
+          <button class="btn small" type="button" data-size="1920x1080">16:9</button>
+          <button class="btn small" type="button" data-size="1080x1920">9:16</button>
+          <button class="btn small" type="button" data-size="1080x1080">1:1</button>
+        </div>
+        <div class="sec">Range</div>
+        <div class="rng">
+          <label for="expFrom">From (s)</label><input id="expFrom" type="number" min="0" step="0.1" placeholder="start"><button class="btn small" id="fromHere" type="button">Playhead</button>
+          <label for="expTo">To (s)</label><input id="expTo" type="number" min="0" step="0.1" placeholder="end"><button class="btn small" id="toHere" type="button">Playhead</button>
+        </div>
         <div class="sec">Record</div>
         <div class="row"><label for="fps">Frame rate</label>
           <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
@@ -114,10 +164,26 @@
  </div>
 </div>
 
+<dialog id="help">
+  <h2>Keyboard shortcuts</h2>
+  <dl>
+    <dt>Space</dt><dd>Play or pause</dd>
+    <dt>← →</dt><dd>Back or forward 2 s (Shift: 10 s)</dd>
+    <dt>Home / End</dt><dd>Jump to start or end</dd>
+    <dt>+ / −</dt><dd>Zoom the piano roll in or out</dd>
+    <dt>F</dt><dd>Full screen preview</dd>
+    <dt>L</dt><dd>Show or hide the lyric box</dd>
+    <dt>1 – 5</dt><dd>Projects, Effects, Look, Visuals, Export</dd>
+    <dt>?</dt><dd>This list</dd>
+  </dl>
+  <form method="dialog"><button class="btn primary" type="submit">Close</button></form>
+</dialog>
+
 
 <script src="vendor/js-yaml.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="parsers.js"></script>
+<script src="lyrics.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
