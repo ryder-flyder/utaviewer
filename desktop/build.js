@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const app = path.join(__dirname, 'app');
 fs.rmSync(app, { recursive: true, force: true });
 fs.mkdirSync(app, { recursive: true });
-for (const f of ['index.html', 'favicon.svg', 'LICENSE']) fs.copyFileSync(path.join(root, f), path.join(app, f));
+for (const f of ['index.html', 'style.css', 'parsers.js', 'app.js', 'favicon.svg', 'LICENSE']) fs.copyFileSync(path.join(root, f), path.join(app, f));
 fs.cpSync(path.join(root, 'vendor'), path.join(app, 'vendor'), { recursive: true });
 fs.copyFileSync(path.join(__dirname, 'main.js'), path.join(app, 'main.js'));
 fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
