@@ -235,23 +235,57 @@ function parseVSQX(text) {
   return { fmt: 'VSQX', title: '', tm, tracks };
 }
 
+// Synthesizer V Studio 1 keeps pitch as a pitchDelta list (cents). Studio 2 (file version 190+) keeps it in pitchControls:
+// curves of absolute pitch (time = pos + x, pitch = pitch + y) plus single anchor points, and its pitchDelta is all zeros.
+function svControlsFn(controls, off, tm) {
+  const pairs = [];
+  for (const c of controls) {
+    if (c.type === 'curve' && c.points) for (let k = 0; k + 1 < c.points.length; k += 2) pairs.push([tm.t2s(off + c.pos + c.points[k]), c.pitch + c.points[k + 1]]);
+    else if (c.type === 'point') pairs.push([tm.t2s(off + c.pos), c.pitch]);
+  }
+  if (!pairs.length) return null;
+  pairs.sort((a, b) => a[0] - b[0]);
+  const xs = pairs.map(p => p[0]), ys = pairs.map(p => p[1]), n = xs.length;
+  // absolute pitch at t, or null where there is no control data close by
+  return t => {
+    if (t < xs[0] || t > xs[n - 1]) return null;
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= t) lo = m; else hi = m; }
+    if (xs[hi] - xs[lo] > 0.5) return null;
+    return ys[lo] + (ys[hi] - ys[lo]) * ((t - xs[lo]) / ((xs[hi] - xs[lo]) || 1e-9));
+  };
+}
+const SV_SPECIAL = /^(br|cl|sil|pau)$/i;
+
 function parseSVP(bytes) {
   const j = JSON.parse(decodeText(bytes).replace(/\0+$/, ''));
   const tempos = ((j.time && j.time.tempo) || [{ position: 0, bpm: 120 }]).map(t => ({ tick: t.position || 0, bpm: t.bpm }));
   const tm = makeTempoMap(tempos, BLICK), lib = new Map((j.library || []).map(g => [g.uuid, g])), tracks = [];
+  const v2 = (j.version || 0) >= 160 || (j.library || []).some(g => Array.isArray(g.pitchControls));
   (j.tracks || []).forEach((tr, i) => {
     const notes = [];
-    const addGroup = (g, off) => {
+    const addGroup = (g, ref) => {
       if (!g || !g.notes) return;
+      const off = (ref && ref.blickOffset) || 0, shift = (ref && ref.pitchOffset) || 0;
+      const lo = ref && ref.blickAbsoluteBegin != null ? ref.blickAbsoluteBegin : -Infinity, hi = ref && ref.blickAbsoluteEnd > 0 ? ref.blickAbsoluteEnd : Infinity;
       const pd = g.parameters && g.parameters.pitchDelta && g.parameters.pitchDelta.points; let pf = null;
       if (pd && pd.length >= 2) { const xs = [], ys = []; for (let k = 0; k + 1 < pd.length; k += 2) { xs.push(tm.t2s(off + pd[k])); ys.push(pd[k + 1] <= -1199 ? 0 : pd[k + 1] / 100); } pf = pointsFn(xs, ys, null, true); }
-      for (const n of g.notes) { const a = off + n.onset; notes.push(mkNote(tm.t2s(a), tm.t2s(a + n.duration), n.pitch + (n.detune || 0) / 100, cleanLyric(n.lyrics), [pf])); }
+      const abs = g.pitchControls && g.pitchControls.length ? svControlsFn(g.pitchControls, off, tm) : null;
+      for (const n of g.notes) {
+        const a = off + n.onset; if (a < lo || a >= hi) continue;
+        const p = n.pitch + shift + (n.detune || 0) / 100;
+        const f = abs ? (t => { const v = abs(t); return v == null ? 0 : v + shift - p; }) : pf;
+        const raw = (n.lyrics || '').trim(), phon = raw[0] === '.', lyric = cleanLyric(phon ? raw.slice(1) : raw);
+        const nn = mkNote(tm.t2s(a), tm.t2s(a + n.duration), p, lyric, [f]);
+        if (SV_SPECIAL.test(raw)) nn.rest = true;
+        notes.push(nn);
+      }
     };
-    addGroup(tr.mainGroup, (tr.mainRef && tr.mainRef.blickOffset) || 0);
-    for (const r of tr.groups || []) addGroup(lib.get(r.groupID), r.blickOffset || 0);
+    addGroup(tr.mainGroup, tr.mainRef);
+    for (const r of tr.groups || []) addGroup(lib.get(r.groupID), r);
     if (notes.length) { notes.sort((a, b) => a.t0 - b.t0); tracks.push({ name: tr.name || ('Track ' + (i + 1)), notes }); }
   });
-  return { fmt: 'SVP', title: (j.meta && j.meta.name) || '', tm, tracks };
+  return { fmt: 'SVP', variant: v2 ? 'Studio 2' : 'Studio 1', title: (j.meta && j.meta.name) || '', tm, tracks };
 }
 
 async function parseVPR(buf) {
@@ -398,18 +432,26 @@ function parseTSSLN(bytes) {
   return { fmt: 'TSSLN', title: '', tm: firstTm || makeTempoMap([{ tick: 0, bpm: 120 }], res), tracks };
 }
 
+const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project' };
 async function parseProjectFile(file, bendRange) {
   const ext = file.name.split('.').pop().toLowerCase(), buf = await file.arrayBuffer();
+  if (!KIND[ext]) throw new Error('Unsupported file type .' + ext);
+  if (!buf.byteLength) throw new Error('The file is empty');
   let r;
-  if (ext === 'ustx') r = parseUSTX(decodeText(new Uint8Array(buf)));
-  else if (ext === 'ust') r = parseUST(new Uint8Array(buf));
-  else if (ext === 'mid' || ext === 'midi') r = parseMIDI(buf, bendRange);
-  else if (ext === 'vsqx') r = parseVSQX(decodeText(new Uint8Array(buf)));
-  else if (ext === 'vpr') r = await parseVPR(buf);
-  else if (ext === 'svp') r = parseSVP(new Uint8Array(buf));
-  else if (ext === 'ccs') r = parseCCS(decodeText(new Uint8Array(buf)));
-  else if (ext === 'tssln') r = parseTSSLN(new Uint8Array(buf));
-  else throw new Error('Unsupported file type .' + ext);
+  try {
+    if (ext === 'ustx') r = parseUSTX(decodeText(new Uint8Array(buf)));
+    else if (ext === 'ust') r = parseUST(new Uint8Array(buf));
+    else if (ext === 'mid' || ext === 'midi') r = parseMIDI(buf, bendRange);
+    else if (ext === 'vsqx') r = parseVSQX(decodeText(new Uint8Array(buf)));
+    else if (ext === 'vpr') r = await parseVPR(buf);
+    else if (ext === 'svp') r = parseSVP(new Uint8Array(buf));
+    else if (ext === 'ccs') r = parseCCS(decodeText(new Uint8Array(buf)));
+    else r = parseTSSLN(new Uint8Array(buf));
+  } catch (e) {
+    // our own messages are already readable, parser internals are not
+    if (e && /^(No |Not |Invalid |Unsupported)/.test(e.message)) throw e;
+    throw new Error('This does not look like ' + KIND[ext] + ', or it is damaged');
+  }
   r.tracks = r.tracks.filter(t => t.notes.length);
   if (!r.tracks.length) throw new Error('No notes found');
   return r;

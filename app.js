@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const $ = (s, r = document) => r.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function h(tag, props, ...kids) {
@@ -36,6 +36,29 @@ const PRESETS = {
   'Mono': { g: 'Moods', bg1: '#0f0f10', bg2: '#1a1a1c', grid: '#bbbbbb', rowW: '#000000', rowWA: 0, rowB: '#ffffff', rowBA: 0.05, keyW: '#d8d8d8', keyB: '#161617', fg: '#f0f0f0', play: '#ffffff', hi: '#ffffff', act: '#ffffff', pitch: '', edge: '', palette: ['#f2f2f2', '#9c9c9c', '#cfcfcf', '#6f6f6f'], fx: { ...SHOW } }
 };
 const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default' };
+// colour themes named after vocal synth characters, built from one accent and a palette
+const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+const CHARS = [
+  ['Miku', '#39c5bb', '#051a1d', '#0b2f33', ['#39c5bb', '#ff6fae', '#8ff0e8', '#ffffff', '#1f8f93', '#ffc4de']],
+  ['Kagamine', '#ffc928', '#1a1405', '#2d2308', ['#ffc928', '#ff8f2e', '#fff0a0', '#ffffff', '#e0a010', '#5b6b8a']],
+  ['Luka', '#ff9ec4', '#1d0d16', '#301424', ['#ff9ec4', '#ffd2e4', '#e8b84a', '#ffffff', '#e05a92', '#7fd6ff']],
+  ['MEIKO', '#e0313b', '#1c080b', '#2e0f14', ['#e0313b', '#ff7a6a', '#ffd0c8', '#ffffff', '#a01e2a', '#6a3a2a']],
+  ['KAITO', '#3d6ff0', '#070d22', '#0e1a3e', ['#3d6ff0', '#8fb4ff', '#ffffff', '#2b3f8a', '#7fe0ff', '#c8d8ff']],
+  ['GUMI', '#8be04d', '#0c1a08', '#162b0e', ['#8be04d', '#ff9a3d', '#d8ffb0', '#ffffff', '#4fa02a', '#ffd27a']],
+  ['Teto', '#e8334f', '#1b080d', '#2d0f17', ['#e8334f', '#ff8696', '#ffffff', '#9a1f36', '#ffc2c9', '#6a2a3a']],
+  ['Yukari', '#a37cf0', '#120b21', '#1e1238', ['#a37cf0', '#d6b8ff', '#ff9ad0', '#ffffff', '#6a4cc0', '#9ad8ff']],
+];
+for (const [name, c, b1, b2, pal] of CHARS) {
+  PRESETS[name] = Object.assign({}, PRESETS.Default, { g: 'Characters', bg1: b1, bg2: b2, grid: c, rowB: c, keyW: toHex(mixc(c, '#ffffff', 0.86)), keyB: b1, fg: toHex(mixc(c, '#ffffff', 0.9)), hi: toHex(mixc(c, '#ffffff', 0.75)), palette: pal, fx: { ...SHOW } });
+  // light variant: pale tinted paper, darker accents so notes stay readable
+  const dk = (x, t) => toHex(mixc(x, '#000000', t));
+  PRESETS[name].alt = Object.assign({}, PRESETS[name], {
+    bg1: toHex(mixc(c, '#ffffff', 0.94)), bg2: toHex(mixc(c, '#ffffff', 0.86)), grid: dk(c, 0.3), rowB: dk(c, 0.3), rowBA: 0.07,
+    keyW: '#ffffff', keyB: dk(c, 0.62), fg: dk(c, 0.72), play: dk(c, 0.55), hi: dk(c, 0.5), act: dk(c, 0.35),
+    palette: pal.map(p => lum(p) > 0.8 ? dk(c, 0.45) : lum(p) > 0.62 ? dk(p, 0.3) : p), fx: { ...SHOW, glow: 5 }
+  });
+}
+const presetOf = name => { const b = PRESETS[name] || PRESETS.Default; return look.shade === 'light' && b.alt ? b.alt : b; };
 const BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -76,6 +99,22 @@ const FXDEF = [
   { sec: 'Background' },
   { k: 'bgDim', t: 'range', l: 'Dim', min: 0, max: 95, step: 1, u: '%' },
   { k: 'bgBlur', t: 'range', l: 'Blur', min: 0, max: 24, step: 1, u: 'px' },
+  { sec: 'Audio visualizer' },
+  { hint: 'Uses the audio you add in Projects. Nothing is drawn without audio. Use up to two at once.' },
+  { k: 'wfStyle', t: 'select', l: 'Style (one at a time)', opts: [['off', 'Off'], ['scope', 'Scope line'], ['bars', 'Spectrum bars'], ['keys', 'Piano-key spectrum']] },
+  { k: 'wfColor', show: 'any', t: 'select', l: 'Colors', opts: [['theme', 'Theme palette'], ['custom', 'Custom colors']] },
+  { k: 'wfColA', show: 'any', t: 'color', l: 'Custom color 1 (lines, low end)' },
+  { k: 'wfColB', show: 'any', t: 'color', l: 'Custom color 2 (peaks, tops)' },
+  { k: 'wfOpacity', show: 'any', t: 'range', l: 'Opacity', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfGain', show: 'any', t: 'range', l: 'Sensitivity', min: 25, max: 300, step: 5, u: '%' },
+  { k: 'wfOver', show: 'any', t: 'toggle', l: 'Draw over the notes (otherwise under them)' },
+  { k: 'wfScopeW', show: 'scope', t: 'range', l: 'Scope line width', min: 1, max: 10, step: 0.5, u: 'px' },
+  { k: 'wfScopeY', show: 'scope', t: 'range', l: 'Scope height in the view', min: 10, max: 90, step: 1, u: '%' },
+  { k: 'wfBarN', show: 'bars', t: 'range', l: 'Bar count', min: 16, max: 128, step: 8, u: '' },
+  { k: 'wfBarH', show: 'bars', t: 'range', l: 'Bar height', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfBarPos', show: 'bars', t: 'select', l: 'Bar position', opts: [['bottom', 'Bottom'], ['top', 'Top'], ['center', 'Mirrored from the middle']] },
+  { k: 'wfKeyLen', show: 'keys', t: 'range', l: 'Piano-key spectrum length', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfKeySide', show: 'keys', t: 'select', l: 'Piano-key spectrum side', opts: [['left', 'From the keys'], ['right', 'From the right edge']] },
   { sec: 'Notes and rows' },
   { k: 'noteH', t: 'range', l: 'Note height', min: 40, max: 100, step: 1, u: '%' },
   { k: 'round', t: 'range', l: 'Corner rounding', min: 0, max: 50, step: 1, u: '%' },
@@ -94,17 +133,54 @@ const FXDEF = [
   { k: 'keys', t: 'toggle', l: 'Piano keys' },
   { k: 'grid', t: 'toggle', l: 'Grid lines' }
 ];
-const FX0 = { highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0 };
+const FX0 = { wfStyle: 'off', wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off' };
 const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
-const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', lyricText: '', lyrTrack: 'auto' };
+const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', lyricText: '', lyricText2: '', lyrTrack: 'auto', bgMode: 'normal', shade: 'dark', tc: {}, themes: {} };
 let fx = { ...FX0 }, look = { ...LOOK0 };
 try { const s = JSON.parse(localStorage.getItem('utaviewer.v2') || 'null'); if (s) { Object.assign(fx, s.fx || {}); Object.assign(look, s.look || {}); if (look.size === '1280x720' && look.fps === '30' && look.mbps === '8') Object.assign(look, { size: LOOK0.size, fps: LOOK0.fps, mbps: LOOK0.mbps }); } } catch (e) {}
 if (look.mine) PRESETS['My theme'] = look.mine; else PRESETS['My theme'] = Object.assign({}, PRESETS.Default, { g: 'Yours', fx: {} });
-if (!PRESETS[look.preset]) look.preset = 'Default';
 if (!look.colors) look.colors = {};
+if (!look.tc || typeof look.tc !== 'object') look.tc = {};
+if (!look.themes || typeof look.themes !== 'object') look.themes = {};
+// theme files: colors and effects only, safe to share (no portraits, backgrounds or lyrics)
+const TH_COLORS = ['bg1', 'bg2', 'grid', 'rowW', 'rowB', 'keyW', 'keyB', 'fg', 'play', 'hi', 'act', 'pitch', 'edge'];
+const TH_NUMS = ['rowWA', 'rowBA', 'rowTintA'];
+const okHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+function cleanVariant(o) {
+  if (!o || typeof o !== 'object') return null;
+  const v = {};
+  for (const k of TH_COLORS) if (okHex(o[k])) v[k] = o[k].toLowerCase(); else if ((k === 'pitch' || k === 'edge') && o[k] === '') v[k] = '';
+  for (const k of TH_NUMS) if (typeof o[k] === 'number' && o[k] >= 0 && o[k] <= 1) v[k] = o[k];
+  if (Array.isArray(o.rows) && o.rows.length === 12 && o.rows.every(okHex)) v.rows = o.rows.map(x => x.toLowerCase());
+  if (!okHex(v.bg1) || !okHex(v.fg)) return null;
+  if (!okHex(v.bg2)) v.bg2 = v.bg1;
+  const pal = Array.isArray(o.palette) ? o.palette.filter(okHex).slice(0, 6).map(x => x.toLowerCase()) : [];
+  v.palette = pal.length ? pal : PRESETS.Default.palette.slice();
+  return v;
+}
+function cleanTheme(d) {
+  const dark = cleanVariant(d.dark), light = cleanVariant(d.light);
+  const main = dark || light; if (!main) return null;
+  const fxo = {};
+  for (const k of STYLEKEYS) if (d.fx && typeof d.fx[k] === typeof FX0[k] && (typeof FX0[k] !== 'number' || isFinite(d.fx[k]))) fxo[k] = d.fx[k];
+  const P = Object.assign({}, PRESETS.Default, main, { g: 'Yours', fx: fxo });
+  if (dark && light) P.alt = Object.assign({}, PRESETS.Default, light, { g: 'Yours', fx: fxo });
+  return P;
+}
+function variantOut(P) { const o = {}; for (const k of [...TH_COLORS, ...TH_NUMS, 'rows', 'palette']) if (P[k] !== undefined && P[k] !== null) o[k] = P[k]; return o; }
+function registerTheme(name, P) {
+  const builtin = n => PRESETS[n] && PRESETS[n].g !== 'Yours';
+  if (/^(__proto__|constructor|prototype|toString|hasOwnProperty)$/.test(name)) name = 'Theme ' + name;
+  let n = name, i = 2; while (builtin(n)) n = name + ' (' + i++ + ')';
+  P.g = 'Yours'; if (P.alt) P.alt.g = 'Yours';
+  PRESETS[n] = P; look.themes[n] = P; return n;
+}
+for (const n in look.themes) { const P = cleanTheme({ dark: look.themes[n], light: look.themes[n].alt, fx: look.themes[n].fx }); if (P) PRESETS[n] = P; else delete look.themes[n]; }
+if (!PRESETS[look.preset]) look.preset = 'Default';
+const tkey = (f, t) => f.name + '|' + t.name;
 const save = () => { try { localStorage.setItem('utaviewer.v2', JSON.stringify({ fx, look })); } catch (e) {} };
 
-const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], linesDirty: true };
+const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], lines2: [], linesDirty: true, loop: { a: null, b: null, on: false }, queue: [] };
 const cv = $('#cv'), ctx = cv.getContext('2d');
 
 // status
@@ -134,12 +210,15 @@ const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m *
 
 function addProject(res, name) {
   const pal = S.P.palette;
-  const f = { id: S.nextId++, name, fmt: res.fmt, tm: res.tm, offset: 0, tracks: res.tracks.map(t => ({ name: t.name, notes: t.notes, on: true, color: pal[S.ci++ % pal.length] })) };
+  const f = { id: S.nextId++, name, fmt: res.fmt, variant: res.variant || '', tm: res.tm, offset: 0, tracks: res.tracks.map(t => ({ name: t.name, notes: t.notes, on: true, color: pal[S.ci++ % pal.length] })) };
+  for (const t of f.tracks) { const c = look.tc[tkey(f, t)]; if (c) t.color = c; }
   S.files.push(f);
 }
+// extension wins over the browser's guess: Chrome reports .mid as audio/mid
+const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln'];
 async function addFiles(list) {
   const files = Array.from(list), audio = [], proj = [];
-  for (const f of files) { const e = f.name.split('.').pop().toLowerCase(); (['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(e) || f.type.startsWith('audio/') ? audio : proj).push(f); }
+  for (const f of files) { const e = f.name.split('.').pop().toLowerCase(); (PROJ_EXT.includes(e) ? proj : (['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(e) || f.type.startsWith('audio/') ? audio : proj)).push(f); }
   const errs = []; let added = 0, styled = '';
   for (const f of proj) {
     try {
@@ -220,6 +299,10 @@ window.addEventListener('keydown', e => {
   else if (k === '-' || k === '_') nudgeWindow(1);
   else if (k === 'f' || k === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else if ($('#screen').requestFullscreen) $('#screen').requestFullscreen().catch(() => {}); }
   else if (k === 'l' || k === 'L') { fx.lyrShow = !fx.lyrShow; syncVisInputs(); save(); msg('Lyric box ' + (fx.lyrShow ? 'on.' : 'off.')); }
+  else if (k === '[') loopPoint('a');
+  else if (k === ']') loopPoint('b');
+  else if (k === 'r' || k === 'R') toggleLoop();
+  else if (k === 'Escape') clearLoop();
   else if (k === '?' || k === '/') { $('#help').showModal(); }
   else if (/^[1-5]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
 });
@@ -229,7 +312,7 @@ $('#btnHelp').addEventListener('click', () => $('#help').showModal());
 // drawing
 const FONT = '"Instrument Sans","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
 function updateP() {
-  const base = PRESETS[look.preset] || PRESETS.Default, P = Object.assign({}, base, look.colors || {});
+  const base = presetOf(look.preset), P = Object.assign({}, base, look.colors || {});
   if (look.palette && look.palette.length) P.palette = look.palette.slice();
   P.light = lum(P.bg1) > 0.55;
   P.pitchRgb = P.pitch ? hex2rgb(P.pitch) : null;
@@ -282,13 +365,18 @@ function draw(T) {
   const span = hi - lo + 1, rowH = H / span, yOf = p => (hi - p + 0.5) * rowH, loI = Math.floor(lo) - 1, hiI = Math.ceil(hi) + 1;
   const tL = T - (playX - keysW) / pps, tR = T + (W - playX) / pps, gr = hex2rgb(P.grid);
   ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
-  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, P.bg1); g.addColorStop(1, P.bg2);
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  drawBg(W, H, P);
+  const bgm = look.bgMode;
+  if (bgm === 'alpha') ctx.clearRect(0, 0, W, H);
+  else if (bgm === 'green') { ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, W, H); }
+  else {
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, P.bg1); g.addColorStop(1, P.bg2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    drawBg(W, H, P);
+  }
   const tm = S.tm, bph = tm ? (((tm.s2t(T) / tm.res) % 1) + 1) % 1 : 0, pulse = fx.pulse && S.playing ? Math.exp(-bph * 6) : 0;
 
   ctx.save(); ctx.beginPath(); ctx.rect(keysW, 0, W - keysW, H); ctx.clip();
-  if (fx.rows) {
+  if (fx.rows && bgm === 'normal') {
     const tint = fx.rowTint && P.rows;
     for (let p = loI; p <= hiI; p++) {
       const pc = ((p % 12) + 12) % 12, blk = BLACK[pc];
@@ -319,6 +407,7 @@ function draw(T) {
   }
 
   drawPortraits(W, H, keysW, P);
+  drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, false);
   const act = [], jobs = [], gl = fx.glow * sc, nh = rowH * fx.noteH / 100, rad = nh * fx.round / 100;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const { f, t } of allTracks()) {
@@ -397,6 +486,7 @@ function draw(T) {
     ctx.globalAlpha = 1;
   }
 
+  drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, true);
   if (S.parts.length) {
     if (!P.light) ctx.globalCompositeOperation = 'lighter';
     for (const p of S.parts) { const k = p.life / p.max; ctx.fillStyle = css(p.c, k * (P.light ? 0.9 : 0.8)); ctx.beginPath(); ctx.arc(p.x, p.y, p.s * (0.4 + k * 0.6), 0, 6.2832); ctx.fill(); }
@@ -514,6 +604,7 @@ function updateTL() {
     const sig = lanes.map(l => l.name + l.color + l.on + (l.f ? l.f.offset : '')).join('|') + '|' + S.duration.toFixed(2) + '|' + tlZoom.value + '|' + tlScroll.clientWidth + '|' + (S.buf ? 1 : 0) + '|' + (document.documentElement.dataset.theme || '') + '|' + window.innerWidth;
     if (sig !== tlSig) { tlSig = sig; drawTL(); }
   }
+  if (S.loop.a != null) syncLoopUI();
   const x = S.time * tlPps; phead.style.transform = 'translateX(' + x + 'px)';
   if (S.playing && !tlDrag) { const l = tlScroll.scrollLeft, vw = tlScroll.clientWidth - 150; if (x < l || x > l + vw - 40) tlScroll.scrollLeft = Math.max(0, x - 40); }
 }
@@ -540,6 +631,7 @@ function loop(ts) {
   const dt = clamp((ts - (S.last || ts)) / 1000, 0, 0.1); S.last = ts;
   if (S.playing && S.ctx) {
     S.time = S.t0 + (S.ctx.currentTime - S.c0);
+    if (S.loop.on && !S.exporting && S.time >= S.loop.b) seek(S.loop.a);
     const lim = S.exporting && S.exporting.to != null ? S.exporting.to : S.duration;
     if (S.time >= lim) {
       S.time = lim; pause();
@@ -561,13 +653,14 @@ function renderProjects() {
   if (!S.files.length) { box.append(h('div', { class: 'empty' }, 'No projects loaded. Add files or drop them on the preview.')); return; }
   for (const f of S.files) {
     const el = h('div', { class: 'file', style: 'margin-bottom:10px' },
-      h('div', { class: 'fh' }, h('span', { class: 'fn', title: f.name }, f.name), h('span', { class: 'badge' }, f.fmt),
+      h('div', { class: 'fh' }, h('span', { class: 'fn', title: f.name }, f.name), h('span', { class: 'badge' }, f.fmt + (f.variant ? ' · ' + f.variant : '')),
         h('button', { class: 'btn small', type: 'button', 'aria-label': 'Remove ' + f.name, onclick: () => { S.files = S.files.filter(x => x !== f); recalc(); renderProjects(); } }, 'Remove')));
     for (const t of f.tracks) {
       el.append(h('div', { class: 'trk' },
         h('input', { type: 'checkbox', checked: t.on, 'aria-label': 'Show ' + t.name, onchange: e => { t.on = e.target.checked; recalc(); } }),
-        h('input', { type: 'color', value: t.color, 'aria-label': 'Color for ' + t.name, oninput: e => { t.color = e.target.value; } }),
-        h('span', { class: 'tn', title: t.name }, t.name), h('span', { class: 'nc' }, t.notes.length + ' notes')));
+        h('input', { type: 'color', value: t.color, title: 'Note color for this track', 'aria-label': 'Color for ' + t.name, oninput: e => { t.color = e.target.value; look.tc[tkey(f, t)] = t.color; save(); }, onchange: () => renderProjects() }),
+        h('span', { class: 'tn', title: t.name }, t.name), h('span', { class: 'nc' }, t.notes.length + ' notes'),
+        look.tc[tkey(f, t)] ? h('button', { class: 'btn small', type: 'button', title: 'Back to the theme color', 'aria-label': 'Reset color for ' + t.name, onclick: () => { delete look.tc[tkey(f, t)]; recolorTracks(); save(); } }, 'Reset') : null));
     }
     el.append(h('div', { class: 'foff' }, h('label', { for: 'off' + f.id }, 'Time offset'),
       h('input', { id: 'off' + f.id, type: 'number', step: 10, value: f.offset, oninput: e => { f.offset = parseFloat(e.target.value) || 0; recalc(); } }), 'ms'));
@@ -586,6 +679,8 @@ function renderAudio() {
 // effects + look UI
 const ctrlRefs = {};
 function syncControl(k) { const r = ctrlRefs[k]; if (!r) return; if (r.type === 'checkbox') r.checked = !!fx[k]; else { r.value = fx[k]; if (r.nextOutput) r.nextOutput.textContent = fx[k] + (r.u || ''); } }
+const wfRows = [];
+function syncWf() { for (const e of wfRows) e.hidden = fx.wfStyle === 'off' || (e.dataset.show !== 'any' && e.dataset.show !== fx.wfStyle); }
 function buildFx() {
   const pane = $('#fxPane'); let box = pane, first = true;
   for (const d of FXDEF) {
@@ -594,8 +689,12 @@ function buildFx() {
       if (first) { det.open = true; first = false; }
       pane.append(det); box = body; continue;
     }
+    if (d.hint) { box.append(h('p', { class: 'hint' }, d.hint)); continue; }
     const id = 'fx-' + d.k; let el;
-    if (d.t === 'toggle') {
+    if (d.t === 'color') {
+      const inp = h('input', { type: 'color', id, value: fx[d.k], oninput: e => { fx[d.k] = e.target.value; save(); } });
+      ctrlRefs[d.k] = inp; el = h('label', { class: 'cell', for: id, style: 'margin:0' }, h('span', null, d.l), inp);
+    } else if (d.t === 'toggle') {
       const inp = h('input', { type: 'checkbox', id, checked: !!fx[d.k], onchange: e => { fx[d.k] = e.target.checked; save(); } });
       ctrlRefs[d.k] = inp; el = h('label', { class: 'chk', for: id }, inp, h('span', null, d.l));
     } else if (d.t === 'range') {
@@ -605,13 +704,15 @@ function buildFx() {
       inp.nextOutput = out; inp.u = d.u; ctrlRefs[d.k] = inp;
       el = h('div', { class: 'row r' }, h('label', { for: id }, d.l), out, inp);
     } else {
-      const sel = h('select', { id, onchange: e => { fx[d.k] = e.target.value; save(); } }, d.opts.map(o => h('option', { value: o[0] }, o[1])));
+      const sel = h('select', { id, onchange: e => { fx[d.k] = e.target.value; if (d.k === 'wfStyle') syncWf(); save(); } }, d.opts.map(o => h('option', { value: o[0] }, o[1])));
       sel.value = fx[d.k]; ctrlRefs[d.k] = sel; el = h('div', { class: 'row' }, h('label', { for: id }, d.l), sel);
       el.style.gridTemplateColumns = 'minmax(0,1fr)';
     }
+    if (d.show) { el.dataset.show = d.show; wfRows.push(el); }
     box.append(el);
   }
-  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); syncVisInputs(); save(); recalc(); } }, 'Reset effects'));
+  syncWf();
+  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); syncVisInputs(); syncWf(); save(); recalc(); } }, 'Reset effects'));
 }
 const COLORDEF = [['bg1', 'Background top'], ['bg2', 'Background bottom'], ['rowW', 'Row, white key'], ['rowB', 'Row, black key'], ['grid', 'Grid lines'], ['keyW', 'Key, white'], ['keyB', 'Key, black'], ['play', 'Playhead'], ['pitch', 'Pitch curve'], ['act', 'Active outline'], ['edge', 'Note outline'], ['fg', 'Text']];
 const colorRefs = {}, palRefs = [];
@@ -630,33 +731,40 @@ function buildColorUI() {
     palRefs.push(inp); pal.append(inp);
   }
 }
-function recolorTracks() { const pal = S.P.palette; let i = 0; for (const { t } of allTracks()) t.color = pal[i++ % pal.length]; S.ci = i; renderProjects(); }
+function recolorTracks(all) { const pal = S.P.palette; let i = 0; if (all) look.tc = {}; for (const { f, t } of allTracks()) { const c = look.tc[tkey(f, t)]; t.color = c || pal[i % pal.length]; i++; } S.ci = i; renderProjects(); if (all) save(); }
 function applyPreset(name, auto) {
   if (!PRESETS[name]) return;
   look.preset = name; look.colors = {}; look.palette = null; if (!auto) look.auto = false;
-  const p = PRESETS[name];
+  const p = presetOf(name);
   for (const k of STYLEKEYS) fx[k] = (p.fx && p.fx[k] !== undefined) ? p.fx[k] : FX0[k];
   updateP(); recolorTracks();
   for (const k in ctrlRefs) syncControl(k);
-  syncColorInputs(); $('#autoStyle').checked = !!look.auto; save(); buildPresets();
+  syncColorInputs(); $('#autoStyle').checked = !!look.auto; save(); buildPresets(); syncShade();
 }
 function buildPresets() {
   const box = $('#presetGroups'); box.replaceChildren();
-  const groups = [['Yours', 'Yours'], ['Editors', 'Editor styles'], ['Moods', 'Monochrome']];
+  const groups = [['Yours', 'Yours'], ['Editors', 'Editor styles'], ['Characters', 'Characters'], ['Moods', 'Monochrome']];
   for (const [g, title] of groups) {
     const names = Object.keys(PRESETS).filter(n => PRESETS[n].g === g); if (!names.length) continue;
     box.append(h('div', { class: 'sec' }, title));
     const wrap = h('div', { class: 'presets' });
     for (const name of names) {
-      const P = PRESETS[name];
+      const P = presetOf(name);
       wrap.append(h('button', { class: 'preset', type: 'button', 'aria-pressed': String(look.preset === name), onclick: () => applyPreset(name) },
         h('div', { class: 'sw' }, h('i', { style: 'background:' + P.bg1 }), P.palette.slice(0, 4).map(c => h('i', { style: 'background:' + c }))), h('span', null, name)));
     }
     box.append(wrap);
   }
 }
+function syncShade() {
+  const has = !!(PRESETS[look.preset] && PRESETS[look.preset].alt);
+  document.querySelectorAll('#shade button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === look.shade)); b.disabled = !has; });
+  $('#themeRemove').hidden = !look.themes[look.preset];
+  $('#shadeHint').textContent = has ? 'Only changes the piano roll and exported video. The app theme (top right) stays separate.' : 'Light and dark versions are available for the character themes.';
+}
+document.querySelectorAll('#shade button').forEach(b => b.addEventListener('click', () => { look.shade = b.dataset.v; applyPreset(look.preset, look.auto); syncShade(); }));
 $('#autoStyle').addEventListener('change', e => { look.auto = e.target.checked; save(); });
-$('#applyPal').addEventListener('click', recolorTracks);
+$('#applyPal').addEventListener('click', () => recolorTracks(true));
 $('#resetColors').addEventListener('click', () => applyPreset(look.preset, true));
 $('#saveMine').addEventListener('click', () => {
   const o = {}; for (const k of STYLEKEYS) o[k] = fx[k];
@@ -687,29 +795,38 @@ const scr = $('#screen');
 
 // export
 function pickMime() {
+  if (look.bgMode === 'alpha') { const w = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']; return w.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ''; }
   const c = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
   return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 }
-async function startExport() {
-  if (S.exporting) return;
-  if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record the canvas. Try a current Chrome, Edge or Safari.', 'err'); return; }
-  const mime = pickMime(); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return; }
-  const from = clamp(parseFloat($('#expFrom').value) || 0, 0, S.duration);
-  const toRaw = parseFloat($('#expTo').value), to = isFinite(toRaw) ? clamp(toRaw, 0, S.duration) : S.duration;
-  if (to - from < 0.5) { msg('The end of the range has to be at least half a second after the start.', 'err'); return; }
+async function startExport(opts) {
+  if (S.exporting) return null;
+  if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record the canvas. Try a current Chrome, Edge or Safari.', 'err'); return null; }
+  const mime = pickMime(); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return null; }
+  const whole = !!(opts && opts.whole);
+  const from = whole ? 0 : clamp(parseFloat($('#expFrom').value) || 0, 0, S.duration);
+  const toRaw = parseFloat($('#expTo').value), to = whole || !isFinite(toRaw) ? S.duration : clamp(toRaw, 0, S.duration);
+  if (to - from < 0.5) { msg('The end of the range has to be at least half a second after the start.', 'err'); return null; }
   pause(); await ensureCtx(); S.parts.length = 0;
   const stream = cv.captureStream(parseInt(look.fps, 10));
   S.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: parseFloat(look.mbps) * 1e6, audioBitsPerSecond: 192000 }); } catch (e) { msg('Recording could not start: ' + e.message, 'err'); return; }
+  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: parseFloat(look.mbps) * 1e6, audioBitsPerSecond: 192000 }); } catch (e) { msg('Recording could not start: ' + e.message, 'err'); return null; }
   const chunks = [], type = mime.split(';')[0];
+  let done; const finished = new Promise(r => { done = r; });
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-  rec.onstop = () => { const ex = S.exporting; S.exporting = null; $('#recState').hidden = true; $('#rec').disabled = false; if (ex && !ex.cancel) showResult(new Blob(chunks, { type }), type.includes('mp4') ? 'mp4' : 'webm'); };
+  rec.onstop = () => {
+    const ex = S.exporting; S.exporting = null; $('#recState').hidden = true; $('#rec').disabled = false;
+    const res = ex && !ex.cancel ? { blob: new Blob(chunks, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' } : null;
+    if (res) showResult(res.blob, res.ext);
+    done(res);
+  };
   S.exporting = { rec, cancel: false, from, to }; $('#rec').disabled = true; $('#recState').hidden = false; $('#result').hidden = true;
   seek(from); rec.start(250); await play(); msg('');
+  return finished;
 }
 function finishExport() { const ex = S.exporting; if (ex) setTimeout(() => { try { ex.rec.stop(); } catch (e) {} }, 400); }
-$('#rec').addEventListener('click', startExport);
-$('#recCancel').addEventListener('click', () => { const ex = S.exporting; if (!ex) return; ex.cancel = true; pause(); try { ex.rec.stop(); } catch (e) {} msg('Recording cancelled.'); });
+$('#rec').addEventListener('click', () => startExport());
+$('#recCancel').addEventListener('click', () => { const ex = S.exporting; if (!ex) return; S.qstop = true; ex.cancel = true; pause(); try { ex.rec.stop(); } catch (e) {} msg('Recording cancelled.'); });
 let lastBlob = null, lastExt = 'mp4', lastUrl = null;
 function showResult(blob, ext) {
   lastBlob = blob; lastExt = ext;
@@ -781,6 +898,75 @@ function drawBg(W, H, P) {
   ctx.globalAlpha = fx.bgDim / 100; ctx.fillStyle = css(hex2rgb(P.bg1)); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
 }
 
+// audio visualizer: scope line, spectrum bars and a spectrum laid along the piano rows. Reads the loaded audio at the current time, so it scrubs and exports exactly.
+const FFTN = 4096, FFT = (() => {
+  const rev = new Uint16Array(FFTN), cs = new Float32Array(FFTN / 2), sn = new Float32Array(FFTN / 2), win = new Float32Array(FFTN);
+  for (let i = 0; i < FFTN; i++) { let r = 0, x = i; for (let b = 0; b < 12; b++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (FFTN - 1)); }
+  for (let i = 0; i < FFTN / 2; i++) { cs[i] = Math.cos(2 * Math.PI * i / FFTN); sn[i] = -Math.sin(2 * Math.PI * i / FFTN); }
+  const re = new Float32Array(FFTN), im = new Float32Array(FFTN), mag = new Float32Array(FFTN / 2);
+  return function (x) {
+    for (let i = 0; i < FFTN; i++) { re[rev[i]] = x[i] * win[i]; im[rev[i]] = 0; }
+    for (let size = 2; size <= FFTN; size <<= 1) {
+      const half = size >> 1, step = FFTN / size;
+      for (let i = 0; i < FFTN; i += size) for (let j = 0, k = 0; j < half; j++, k += step) {
+        const a = i + j, b = a + half, tr = re[b] * cs[k] - im[b] * sn[k], ti = re[b] * sn[k] + im[b] * cs[k];
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+      }
+    }
+    for (let i = 0; i < FFTN / 2; i++) mag[i] = Math.hypot(re[i], im[i]) / FFTN * 4;
+    return mag;
+  };
+})();
+const wfBuf = new Float32Array(FFTN);
+function audioSamples(from, n, out) {
+  const b = S.buf, a0 = b.getChannelData(0), a1 = b.numberOfChannels > 1 ? b.getChannelData(1) : null, s0 = Math.round(from);
+  for (let i = 0; i < n; i++) { const k = s0 + i; out[i] = k < 0 || k >= a0.length ? 0 : (a1 ? (a0[k] + a1[k]) * 0.5 : a0[k]); }
+  return out;
+}
+const dbNorm = (v, floor, range, gain) => clamp((20 * Math.log10(v * gain + 1e-6) + floor) / range, 0, 1);
+function binMax(mag, f0, f1, hz) { let i0 = Math.floor(f0 / hz), i1 = Math.ceil(f1 / hz); if (i1 <= i0) i1 = i0 + 1; let m = 0; for (let i = Math.max(1, i0); i <= Math.min(mag.length - 1, i1); i++) if (mag[i] > m) m = mag[i]; return m; }
+function drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, over) {
+  if (!S.buf || fx.wfStyle === 'off' || !!fx.wfOver !== over) return;
+  const sr = S.buf.sampleRate, a = (T + S.shift) * sr, gain = fx.wfGain / 100;
+  const cA = fx.wfColor === 'custom' ? fx.wfColA : (P.palette[0] || '#39c5bb'), cB = fx.wfColor === 'custom' ? fx.wfColB : (P.palette[1] || P.palette[0] || '#ff6fae');
+  ctx.save(); ctx.globalAlpha = fx.wfOpacity / 100; ctx.shadowBlur = 0;
+  const left = keysW, span = W - keysW;
+  if (fx.wfStyle === 'scope') {
+    const N = Math.round(sr * 0.045), pts = 512; const buf = audioSamples(a - N / 2, N, S.wfScope && S.wfScope.length >= N ? S.wfScope : (S.wfScope = new Float32Array(N + 4)));
+    let st = 0; for (let i = 1; i < N * 0.3; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { st = i; break; }
+    const len = N - st - 1, cy = H * (1 - fx.wfScopeY / 100), amp = H * 0.3 * gain;
+    ctx.strokeStyle = cA; ctx.lineWidth = fx.wfScopeW * sc; ctx.lineJoin = 'round'; ctx.shadowColor = cA; ctx.shadowBlur = 14 * sc;
+    ctx.beginPath(); for (let i = 0; i < pts; i++) { const v = buf[st + Math.floor(i / (pts - 1) * len)], x = left + span * i / (pts - 1), y = cy - clamp(v, -1, 1) * amp; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  if (fx.wfStyle === 'bars' || fx.wfStyle === 'keys') {
+    const key = Math.round(a) + '|' + S.buf.length;
+    if (S.wfKey !== key) { S.wfMag = FFT(audioSamples(a - FFTN / 2, FFTN, wfBuf)); S.wfKey = key; }
+    const mag = S.wfMag, hz = sr / FFTN;
+    if (fx.wfStyle === 'bars') {
+      const n = fx.wfBarN, bw = span / n, maxH = H * fx.wfBarH / 100, f0 = 50, f1 = Math.min(12000, sr / 2 - 1), r = Math.pow(f1 / f0, 1 / n), pos = fx.wfBarPos;
+      const g = ctx.createLinearGradient(0, pos === 'top' ? 0 : H - maxH, 0, pos === 'top' ? maxH : H);
+      if (pos === 'top') { g.addColorStop(0, cA); g.addColorStop(1, cB); } else { g.addColorStop(0, cB); g.addColorStop(1, cA); }
+      if (pos === 'center') { const g2 = ctx.createLinearGradient(0, H / 2 - maxH / 2, 0, H / 2 + maxH / 2); g2.addColorStop(0, cB); g2.addColorStop(0.5, cA); g2.addColorStop(1, cB); ctx.fillStyle = g2; } else ctx.fillStyle = g;
+      for (let i = 0; i < n; i++) {
+        const v = dbNorm(binMax(mag, f0 * Math.pow(r, i), f0 * Math.pow(r, i + 1), hz), 70, 60, gain), hh = Math.max(0, v * maxH); if (hh < 1) continue;
+        const x = left + i * bw + bw * 0.08, w = Math.max(1, bw * 0.84);
+        if (pos === 'center') rr(x, H / 2 - hh / 2, w, hh, Math.min(w / 2, 3 * sc)); else rr(x, pos === 'top' ? 0 : H - hh, w, hh, Math.min(w / 2, 3 * sc)); ctx.fill();
+      }
+    }
+    if (fx.wfStyle === 'keys') {
+      const maxL = span * fx.wfKeyLen / 100, right = fx.wfKeySide === 'right';
+      for (let p = loI; p <= hiI; p++) {
+        const f = 440 * Math.pow(2, (p - 69) / 12); if (f < 30 || f > sr / 2 - 1) continue;
+        const v = dbNorm(binMax(mag, f * Math.pow(2, -0.5 / 12), f * Math.pow(2, 0.5 / 12), hz), 72, 55, gain), len = Math.pow(v, 1.15) * maxL; if (len < 1) continue;
+        const x0 = right ? W - len : left, g = ctx.createLinearGradient(right ? W : left, 0, right ? W - len : left + len, 0);
+        g.addColorStop(0, cB); g.addColorStop(1, cA); ctx.globalAlpha = fx.wfOpacity / 100 * 0.85; ctx.fillStyle = g;
+        ctx.fillRect(x0, (hi - p) * rowH + rowH * 0.1, len, rowH * 0.8);
+      }
+    }
+  }
+  ctx.restore();
+}
+
 // portraits are laid under the notes, full height, at the chosen opacity. Several tracks share the width.
 function drawPortraits(W, H, keysW, P) {
   if (!fx.portShow || !S.ports.size) return;
@@ -811,6 +997,7 @@ function lyricTrack() {
 function refreshLines() {
   const src = lyricTrack(), ph = src ? UVLyrics.phrases(src.t, src.f.offset / 1000) : [];
   S.lines = UVLyrics.buildLines(fx.lyrSrc, ph, look.lyricText || '', S.duration); S.linesDirty = false;
+  S.lines2 = (look.lyricText2 || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const info = $('#lyrInfo'); if (!info) return;
   const rows = (look.lyricText || '').split(/\r?\n/).filter(x => x.trim()).length;
   if (fx.lyrSrc === 'notes') info.textContent = ph.length ? ph.length + ' phrases found in the notes.' : 'No lyrics found in the loaded notes.';
@@ -823,16 +1010,26 @@ function drawLyricBox(W, H, sc, keysW, P, T) {
   const cur = UVLyrics.current(S.lines, T); if (!cur || cur.alpha <= 0.01) return;
   const L = cur.line, mg = Math.max(14 * sc, H * 0.025), fs = 28 * sc * fx.lyrSize / 100, maxW = Math.min(W * 0.42, W - keysW - 2 * mg);
   ctx.save(); ctx.font = '650 ' + fs + 'px ' + FONT; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-  const spW = L.join ? ctx.measureText(L.join).width : 0, rows = []; let row = { items: [], w: 0 };
+  const spW = ctx.measureText(' ').width, sepAfter = tk => (L.join === ' ' || tk.gap ? spW : 0), rows = [];
+  let row = { items: [], w: 0 };
   for (const tk of L.tokens) {
-    const tw = ctx.measureText(tk.text).width;
-    if (row.items.length && row.w + spW + tw > maxW && rows.length < 2) { rows.push(row); row = { items: [], w: 0 }; }
-    row.w += (row.items.length ? spW : 0) + tw; row.items.push({ tk, tw });
+    const tw = ctx.measureText(tk.text).width, lead = row.items.length ? sepAfter(row.items[row.items.length - 1].tk) : 0;
+    if (row.items.length && row.w + lead + tw > maxW && rows.length < 2) { rows.push(row); row = { items: [], w: 0 }; }
+    const gapBefore = row.items.length ? sepAfter(row.items[row.items.length - 1].tk) : 0;
+    row.w += gapBefore + tw; row.items.push({ tk, tw, gapBefore });
   }
   rows.push(row);
-  const wid = Math.max(...rows.map(r => r.w)), k = Math.min(1, maxW / wid), lh = fs * 1.3, padX = 18 * sc, padY = 12 * sc;
+  // optional second line: romaji of the kana, or a line the user typed
+  const fs2 = fs * 0.62, lh2 = fs2 * 1.45; let sec = null, w2 = 0;
+  if (fx.lyr2 === 'romaji') {
+    const rt = UVLyrics.romajiTokens(L);
+    if (rt.some((x, i) => x.text !== L.tokens[i].text)) { ctx.font = '600 ' + fs2 + 'px ' + FONT; const sp2 = ctx.measureText(' ').width; sec = rt.map(x => { const tw = ctx.measureText(x.text).width; return { x, tw, sp: x.sp ? sp2 : 0 }; }); w2 = sec.reduce((a, o) => a + o.tw + o.sp, 0) - (sec.length ? sec[sec.length - 1].sp : 0); }
+  } else if (fx.lyr2 === 'typed' && S.lines2[cur.idx]) {
+    ctx.font = '600 ' + fs2 + 'px ' + FONT; const txt = S.lines2[cur.idx]; sec = [{ x: { text: txt, t: -1 }, tw: ctx.measureText(txt).width, sp: 0, plain: true }]; w2 = sec[0].tw;
+  }
+  const wid = Math.max(...rows.map(r => r.w), w2), k = Math.min(1, maxW / wid), lh = fs * 1.3, padX = 18 * sc, padY = 12 * sc;
   const nextTxt = fx.lyrNext && cur.next ? cur.next.tokens.map(t => t.text).join(cur.next.join) : '';
-  const bw = wid * k + padX * 2, bh = (rows.length * lh + (nextTxt ? lh * 0.8 : 0)) * k + padY * 2;
+  const bw = wid * k + padX * 2, bh = (rows.length * lh + (sec ? lh2 : 0) + (nextTxt ? lh * 0.8 : 0)) * k + padY * 2;
   const left = fx.lyrPos === 'bl' || fx.lyrPos === 'tl', center = fx.lyrPos === 'bc', top = fx.lyrPos === 'tl' || fx.lyrPos === 'tr';
   const x = center ? (W + keysW - bw) / 2 : left ? keysW + mg : W - mg - bw;
   const capOff = top && left && look.caption ? 44 * sc : 0;
@@ -842,16 +1039,27 @@ function drawLyricBox(W, H, sc, keysW, P, T) {
   else { ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 8 * sc; }
   ctx.translate(x + padX, y + padY); ctx.scale(k, k);
   const sung = css(hex2rgb(P.act || P.hi)), idle = P.fg;
+  ctx.font = '650 ' + fs + 'px ' + FONT;
   rows.forEach((r, ri) => {
     let px = 0; const cy = (ri + 0.5) * lh;
-    r.items.forEach((it, ii) => {
-      if (ii) px += spW;
-      ctx.fillStyle = !fx.lyrKaraoke || T >= it.tk.t ? (fx.lyrKaraoke ? sung : idle) : idle;
+    r.items.forEach(it => {
+      px += it.gapBefore;
+      ctx.fillStyle = fx.lyrKaraoke && T >= it.tk.t ? sung : idle;
       ctx.globalAlpha = cur.alpha * (fx.lyrKaraoke && T < it.tk.t ? 0.62 : 1);
       ctx.fillText(it.tk.text, px, cy); px += it.tw;
     });
   });
-  if (nextTxt) { ctx.font = '600 ' + fs * 0.7 + 'px ' + FONT; ctx.globalAlpha = cur.alpha * 0.5; ctx.fillStyle = idle; ctx.fillText(fitText(nextTxt, wid), 0, rows.length * lh + lh * 0.4); }
+  let yy = rows.length * lh;
+  if (sec) {
+    ctx.font = '600 ' + fs2 + 'px ' + FONT; let px = 0;
+    for (const o of sec) {
+      const on = !o.plain && fx.lyrKaraoke && T >= o.x.t;
+      ctx.fillStyle = on ? sung : idle; ctx.globalAlpha = cur.alpha * (on ? 0.95 : 0.55);
+      ctx.fillText(o.x.text, px, yy + lh2 / 2); px += o.tw + o.sp;
+    }
+    yy += lh2;
+  }
+  if (nextTxt) { ctx.font = '600 ' + fs * 0.7 + 'px ' + FONT; ctx.globalAlpha = cur.alpha * 0.5; ctx.fillStyle = idle; ctx.fillText(fitText(nextTxt, wid), 0, yy + lh * 0.4); }
   ctx.restore();
 }
 
@@ -876,7 +1084,7 @@ function renderVis() {
   sel.value = [...sel.options].some(o => o.value === look.lyrTrack) ? look.lyrTrack : 'auto';
   $('#lyrTrack').disabled = !S.files.length;
 }
-function syncVisInputs() { $('#portShow').checked = !!fx.portShow; $('#lyrShow').checked = !!fx.lyrShow; $('#lyrSrc').value = fx.lyrSrc; $('#lyrText').value = look.lyricText || ''; }
+function syncVisInputs() { $('#portShow').checked = !!fx.portShow; $('#lyrShow').checked = !!fx.lyrShow; $('#lyrSrc').value = fx.lyrSrc; $('#lyrText').value = look.lyricText || ''; $('#lyr2').value = fx.lyr2; $('#lyrText2').value = look.lyricText2 || ''; $('#lyrText2').hidden = fx.lyr2 !== 'typed'; }
 $('#fileBg').addEventListener('change', e => { if (e.target.files[0]) setBg(e.target.files[0]); e.target.value = ''; });
 $('#portShow').addEventListener('change', e => { fx.portShow = e.target.checked; save(); });
 $('#lyrShow').addEventListener('change', e => { fx.lyrShow = e.target.checked; save(); });
@@ -905,33 +1113,32 @@ function saveBlobAs(blob, name) {
   const a = h('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000); return Promise.resolve();
 }
-$('#lookSave').addEventListener('click', async () => {
-  const ports = {}; for (const [n, p] of S.ports) ports[n] = p.data;
-  const keep = {}; for (const k of ['preset', 'colors', 'palette', 'mine', 'caption', 'size', 'fps', 'mbps', 'lyricText']) keep[k] = look[k];
-  const doc = { utaviewer: 'look', version: VERSION, fx, look: keep, portraits: ports, background: S.bg && S.bg.kind === 'image' ? S.bg.data : null };
-  try { await saveBlobAs(new Blob([JSON.stringify(doc)], { type: 'application/json' }), 'utaviewer-look.json'); msg('Look saved.' + (S.bg && S.bg.kind === 'video' ? ' Background videos are not included.' : ''), 'ok'); }
-  catch (e) { if (!(e && e.code === 'declined')) msg('The look file could not be saved.', 'err'); }
+$('#themeName').value = look.preset === 'Default' || look.preset === 'My theme' ? '' : look.preset;
+$('#themeSave').addEventListener('click', async () => {
+  const cur = PRESETS[look.preset] || PRESETS.Default;
+  const name = ($('#themeName').value.trim() || (look.preset === 'Default' ? 'My theme' : look.preset)).slice(0, 40);
+  const mine = Object.assign({}, S.P); if (look.palette) mine.palette = look.palette.slice();
+  const cv_ = variantOut(mine), other = cur.alt ? (look.shade === 'light' ? variantOut(cur) : variantOut(cur.alt)) : null;
+  const o = {}; for (const k of STYLEKEYS) o[k] = fx[k];
+  const doc = { utaviewer: 'theme', version: VERSION, name };
+  if (other) { doc[look.shade === 'light' ? 'light' : 'dark'] = cv_; doc[look.shade === 'light' ? 'dark' : 'light'] = other; } else doc[S.P.light ? 'light' : 'dark'] = cv_;
+  doc.fx = o;
+  try { await saveBlobAs(new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' }), name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + '.utatheme.json'); msg('Theme saved.', 'ok'); }
+  catch (e) { if (!(e && e.code === 'declined')) msg('The theme file could not be saved.', 'err'); }
 });
-$('#lookLoad').addEventListener('click', () => $('#fileLook').click());
-$('#fileLook').addEventListener('change', async e => {
+$('#themeLoad').addEventListener('click', () => $('#fileTheme').click());
+$('#fileTheme').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try {
-    const d = JSON.parse(await f.text()); if (d.utaviewer !== 'look') throw new Error('not a look file');
-    for (const k in FX0) if (d.fx && d.fx[k] !== undefined && typeof d.fx[k] === typeof FX0[k]) fx[k] = d.fx[k];
-    const l = d.look || {};
-    for (const k of ['preset', 'colors', 'palette', 'mine', 'caption', 'size', 'fps', 'mbps', 'lyricText']) if (l[k] !== undefined) look[k] = l[k];
-    if (look.mine) PRESETS['My theme'] = look.mine;
-    if (!PRESETS[look.preset]) look.preset = 'Default';
-    S.ports.clear();
-    for (const n in d.portraits || {}) { try { S.ports.set(n, { data: d.portraits[n], img: await imgFromSrc(d.portraits[n]) }); } catch (er) {} }
-    clearBg();
-    if (d.background) { try { S.bg = { kind: 'image', el: await imgFromSrc(d.background), data: d.background, name: 'Background from look file' }; } catch (er) {} }
-    updateP(); for (const k in ctrlRefs) syncControl(k);
-    syncColorInputs(); buildPresets(); recolorTracks(); setSize(); syncAspect(); syncVisInputs();
-    $('#size').value = look.size; $('#fps').value = look.fps; $('#mbps').value = look.mbps; $('#caption').value = look.caption || '';
-    save(); recalc(); msg('Look loaded from ' + f.name + '.', 'ok');
-  } catch (er) { msg('That is not a UtaViewer look file.', 'err'); }
+    if (f.size > 200000) throw new Error('big');
+    const d = JSON.parse(await f.text()); if (!d || d.utaviewer !== 'theme') throw new Error('not a theme');
+    const P = cleanTheme(d); if (!P) throw new Error('empty');
+    const name = registerTheme(String(d.name || f.name.replace(/\.utatheme\.json$|\.json$/i, '') || 'Imported theme').slice(0, 40), P);
+    if (d.dark && !d.light) look.shade = 'dark'; else if (d.light && !d.dark) look.shade = 'light';
+    applyPreset(name); msg('Theme "' + name + '" added.', 'ok'); $('#themeName').value = name;
+  } catch (er) { msg('That is not a UtaViewer theme file.', 'err'); }
 });
+$('#themeRemove').addEventListener('click', () => { const n = look.preset; if (!look.themes[n]) return; delete look.themes[n]; delete PRESETS[n]; applyPreset('Default'); msg('Theme removed.', 'ok'); });
 
 // light / dark: follows the system until you pick one
 const THEMES = ['auto', 'light', 'dark'];
@@ -945,9 +1152,108 @@ function applyTheme() {
 $('#btnTheme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(); });
 applyTheme();
 
+// ---- 1.3: loop region, background modes, second lyric line, render queue ----
+// loop
+function syncLoopUI() {
+  const l = S.loop, ok = l.a != null && l.b != null && l.b > l.a;
+  $('#loopBtn').setAttribute('aria-pressed', String(ok && l.on));
+  const band = $('#loopBand'); band.hidden = !ok;
+  if (ok) { band.style.left = l.a * tlPps + 'px'; band.style.width = (l.b - l.a) * tlPps + 'px'; band.style.opacity = l.on ? 0.22 : 0.08; }
+}
+function setLoop(a, b) { S.loop.a = a; S.loop.b = b; S.loop.on = b > a + 0.2; if (!S.loop.on) { S.loop.a = S.loop.b = null; } syncLoopUI(); }
+function loopPoint(which) {
+  const t = S.time, l = S.loop;
+  if (which === 'a') { l.a = t; if (l.b == null || l.b <= t + 0.2) l.b = Math.min(S.duration, t + 4); }
+  else { l.b = t; if (l.a == null || l.a >= t - 0.2) l.a = Math.max(0, t - 4); }
+  l.on = true; syncLoopUI(); msg('Loop ' + fmt(l.a) + ' to ' + fmt(l.b) + '.');
+}
+function toggleLoop() {
+  const l = S.loop;
+  if (l.a == null) { msg('Shift-drag on the timeline, or press [ and ] to mark the loop.'); return; }
+  l.on = !l.on; syncLoopUI();
+}
+function clearLoop() { S.loop.a = S.loop.b = null; S.loop.on = false; syncLoopUI(); }
+$('#loopBtn').addEventListener('click', toggleLoop);
+let loopDrag = null;
+tlBody.addEventListener('pointerdown', e => {
+  if (!e.shiftKey) return;
+  const r = tlBody.getBoundingClientRect(); loopDrag = (e.clientX - r.left) / tlPps; e.stopImmediatePropagation(); tlBody.setPointerCapture(e.pointerId);
+}, true);
+tlBody.addEventListener('pointermove', e => {
+  if (loopDrag == null) return;
+  const r = tlBody.getBoundingClientRect(), t = clamp((e.clientX - r.left) / tlPps, 0, S.duration);
+  S.loop.a = Math.min(loopDrag, t); S.loop.b = Math.max(loopDrag, t); S.loop.on = false; syncLoopUI();
+}, true);
+tlBody.addEventListener('pointerup', () => { if (loopDrag == null) return; loopDrag = null; if (S.loop.b - S.loop.a > 0.2) { S.loop.on = true; syncLoopUI(); } else clearLoop(); }, true);
+
+// video background: normal, transparent or green screen
+function syncBgMode() {
+  $('#bgMode').value = look.bgMode; cv.classList.toggle('alpha', look.bgMode === 'alpha');
+  $('#bgHint').textContent = look.bgMode === 'alpha' ? 'Saved as WebM with a transparent background. Turn off Piano keys in Effects if you only want the notes. Use an editor that reads alpha, like Premiere, DaVinci Resolve or AviUtl2 with a WebM plugin.'
+    : look.bgMode === 'green' ? 'Fills the video with pure green (#00ff00) so you can key it out in any editor.' : '';
+}
+$('#bgMode').addEventListener('change', e => { look.bgMode = e.target.value; save(); syncBgMode(); });
+
+// second lyric line
+$('#lyr2').addEventListener('change', e => { fx.lyr2 = e.target.value; $('#lyrText2').hidden = fx.lyr2 !== 'typed'; save(); });
+$('#lyrText2').addEventListener('input', e => { look.lyricText2 = e.target.value; save(); refreshLines(); });
+
+// render queue: several songs, one after another, each saved as it finishes
+const AUDIO_EXT = ['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'];
+const baseName = n => n.replace(/\.[^.]+$/, '');
+function addToQueue(list) {
+  let added = 0;
+  for (const f of Array.from(list)) {
+    const ext = f.name.split('.').pop().toLowerCase(), base = baseName(f.name), isAudio = !PROJ_EXT.includes(ext) && (AUDIO_EXT.includes(ext) || f.type.startsWith('audio/'));
+    let it = S.queue.find(q => q.base === base);
+    if (!it) { it = { base, proj: null, audio: null, state: '' }; S.queue.push(it); }
+    if (isAudio) it.audio = f; else { it.proj = f; added++; }
+  }
+  const orphans = S.queue.filter(q => !q.proj); S.queue = S.queue.filter(q => q.proj);
+  renderQueue();
+  if (orphans.length) msg('Audio without a project of the same name was skipped: ' + orphans.map(o => o.audio.name).join(', '), 'err');
+}
+function renderQueue() {
+  const box = $('#queueList'); box.replaceChildren();
+  if (!S.queue.length) box.append(h('div', { class: 'empty' }, 'Nothing queued.'));
+  for (const q of S.queue) {
+    box.append(h('div', { class: 'qrow' }, h('span', { class: 'tn', title: q.proj.name }, q.proj.name), h('span', { class: 'st' }, q.audio ? '+ audio' : 'no audio'),
+      h('span', { class: 'st ' + (q.state === 'done' ? 'ok' : q.state === 'error' ? 'err' : '') }, q.state === 'done' ? 'saved' : q.state === 'error' ? 'failed' : q.state === 'working' ? 'rendering' : ''),
+      h('button', { class: 'btn small', type: 'button', disabled: !!S.qrun, onclick: () => { S.queue = S.queue.filter(x => x !== q); renderQueue(); } }, 'Remove')));
+  }
+  $('#qRun').disabled = !!S.qrun || !S.queue.length; $('#qAdd').disabled = !!S.qrun; $('#qClear').disabled = !!S.qrun;
+}
+async function runQueue() {
+  if (S.exporting || S.qrun || !S.queue.length) return;
+  S.qrun = true; S.qstop = false; S.queue.forEach(q => { q.state = ''; });
+  const auto0 = look.auto, cap0 = look.caption; look.auto = false;
+  let ok = 0;
+  for (let i = 0; i < S.queue.length && !S.qstop; i++) {
+    const q = S.queue[i]; q.state = 'working'; renderQueue();
+    $('#qState').textContent = 'Rendering ' + (i + 1) + ' of ' + S.queue.length + ': ' + q.proj.name;
+    try {
+      pause(); S.files = []; S.ci = 0; S.buf = null; S.bufName = ''; S.shift = 0; S.time = 0;
+      addProject(await parseProjectFile(q.proj, fx.bend), q.proj.name);
+      if (q.audio) await loadAudio(q.audio);
+      look.caption = $('#qCaption').checked ? q.base : cap0;
+      recalc(); renderProjects(); renderAudio();
+      const res = await startExport({ whole: true });
+      if (!res) { q.state = ''; break; }
+      await saveBlobAs(res.blob, q.base + '-utaviewer.' + res.ext); q.state = 'done'; ok++;
+    } catch (e) { q.state = 'error'; if (e && e.code === 'declined') { S.qstop = true; } }
+  }
+  look.auto = auto0; look.caption = cap0; S.qrun = false;
+  $('#qState').textContent = S.qstop ? 'Stopped after ' + ok + ' of ' + S.queue.length + '.' : 'Done: ' + ok + ' of ' + S.queue.length + ' saved.';
+  renderQueue(); msg('Queue finished.', ok === S.queue.length ? 'ok' : 'err');
+}
+$('#qAdd').addEventListener('click', () => $('#fileQueue').click());
+$('#fileQueue').addEventListener('change', e => { addToQueue(e.target.files); e.target.value = ''; });
+$('#qRun').addEventListener('click', runQueue);
+$('#qClear').addEventListener('click', () => { S.queue = []; $('#qState').textContent = ''; renderQueue(); });
+
 // init
 $('#ver').textContent = 'v' + VERSION;
-updateP(); setSize(); buildFx(); buildColorUI(); buildPresets(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); $('#autoStyle').checked = !!look.auto;
+updateP(); setSize(); buildFx(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
 msg('Add project files or drop them on the preview to begin. Only UST files layer together.');
 try { const p = window.claude && window.claude.use ? window.claude.use('downloads') : null; if (p) p.then(d => { S.dl = d; }).catch(() => {}); } catch (e) {}
 requestAnimationFrame(loop);

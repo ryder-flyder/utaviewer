@@ -159,3 +159,10 @@ dialog dd{margin:0;color:var(--mute)}
 .row.stack{grid-template-columns:minmax(0,1fr)}
 #lyrText{flex:none;min-height:120px}
 .pane .hint{margin:0}
+canvas#cv.alpha{background:repeating-conic-gradient(#8a8a8a 0 25%,#6a6a6a 0 50%) 0 0/20px 20px}
+#loopBand{position:absolute;top:0;bottom:0;left:0;width:0;background:var(--accent);opacity:.2;pointer-events:none;z-index:1;border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+.tbtn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.qrow{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:13px}
+.qrow .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qrow .st{font-size:12px;color:var(--mute);flex:none}
+.qrow .st.ok{color:var(--ok)} .qrow .st.err{color:var(--err)}
