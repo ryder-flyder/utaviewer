@@ -1,0 +1,13 @@
+{
+  "name": "utaviewer-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Windows desktop build of UtaViewer",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.7.0"
+  }
+}

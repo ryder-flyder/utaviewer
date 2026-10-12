@@ -40,3 +40,9 @@ To run it locally, open `index.html` in a browser, or serve the folder with any 
 ## License
 
 MIT
+
+## Windows app
+
+Releases include a portable Windows build: download `UtaViewer-win-x64.zip` from the [Releases](../../releases) page, unzip it and run `UtaViewer.exe`. It is the same page wrapped in Electron.
+
+To publish a new release, push a version tag (`git tag v1.0.0 && git push origin v1.0.0`). The workflow in `.github/workflows/release.yml` builds the app and attaches the zip. To build it yourself, run `npm install` and `npm run build` inside `desktop/`.
