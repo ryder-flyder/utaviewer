@@ -1,48 +1,33 @@
 # UtaViewer
 
-**Live site: https://ryder-flyder.github.io/utaviewer/**
+**Try it: https://ryder-flyder.github.io/utaviewer/**
 
-A browser tool that shows vocal synth project files on a piano roll, plays the pitch curve and lyrics back over the notes, and exports the result as a video. Everything runs locally in your browser; files are never uploaded.
+Drop in a vocal synth project and watch it play on a piano roll, with the pitch curve and lyrics drawn over the notes. You can export it as a video. Everything runs in your browser, so your files never get uploaded.
 
-## Supported files
+## What it opens
 
-| Program | Extension |
-| --- | --- |
-| UTAU | `.ust` |
-| OpenUtau | `.ustx` |
-| VOCALOID 4 | `.vsqx` |
-| VOCALOID 6 | `.vpr` |
-| Synthesizer V | `.svp` |
-| CeVIO AI | `.ccs` |
-| VoiSona | `.tssln` |
-| MIDI | `.mid` |
+`.ust` `.ustx` `.vsqx` `.vpr` `.svp` `.ccs` `.tssln` `.mid`
 
-Several UST files layer on one roll. Any other project replaces the one that is loaded. Drop an audio file on the preview to play it with the project.
+Several UST files can stack on one roll. Any other project replaces the one that's loaded. You can also drop an audio file on the preview to play it along.
 
 ## Features
 
-- Pitch curves drawn onto the notes as they play, plus glow, note highlight, sparks and lyrics
-- Preset looks based on each program, with editable colors and effects
+- Pitch curves drawn onto the notes as they play, plus glow, highlights, sparks and lyrics
+- Preset looks based on each program, with colors and effects you can change
 - Grid that follows the file's tempo
-- Optional auto-shift of the view with the notes
-- Export to MP4 (WebM in browsers that cannot record MP4), default 1920x1080 at 60 fps
+- Optional auto-shift so the view follows the notes up and down
+- Video export, 1920x1080 at 60 fps by default (MP4 when your browser can do it, WebM if not)
 
-## Use it
+## Using it
 
-Open the [live site](https://ryder-flyder.github.io/utaviewer/), add or drop project files, press play, then use the Export tab and Record video. Recording plays the project once in real time, so keep the tab in the foreground until it finishes.
+Open the site, add your files, hit play, then go to Export and record. It records in real time, so keep the tab open until it's done.
 
-To run it locally, open `index.html` in a browser, or serve the folder with any static server (`python3 -m http.server`).
+Want the Windows app? Grab `UtaViewer-win-x64.zip` from [Releases](https://github.com/ryder-flyder/utaviewer/releases), unzip it and run `UtaViewer.exe`.
 
-## Libraries
+To run the web version yourself, open `index.html` or serve the folder with any static server.
 
-[js-yaml](https://github.com/nodeca/js-yaml) 4.1.0 and [JSZip](https://stuk.github.io/jszip/) 3.10.1, both MIT, are bundled in `vendor/`.
+## Credits
 
-## License
+Uses [js-yaml](https://github.com/nodeca/js-yaml) and [JSZip](https://stuk.github.io/jszip/) (both MIT), included in `vendor/`.
 
-MIT
-
-## Windows app
-
-Releases include a portable Windows build: download `UtaViewer-win-x64.zip` from the [Releases](../../releases) page, unzip it and run `UtaViewer.exe`. It is the same page wrapped in Electron.
-
-To publish a new release, push a version tag (`git tag v1.0.0 && git push origin v1.0.0`). The workflow in `.github/workflows/release.yml` builds the app and attaches the zip. To build it yourself, run `npm install` and `npm run build` inside `desktop/`.
+MIT licensed.
