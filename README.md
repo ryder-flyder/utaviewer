@@ -31,10 +31,6 @@ Open the site, add or drop project files, press play, then use the Export tab an
 
 To run it locally, open `index.html` in a browser, or serve the folder with any static server (`python3 -m http.server`).
 
-## Notes
-
-- Pitch is read from the file where it is stored. VoiSona saves it for some tracks only, and CeVIO files without stored F0 show flat notes.
-- The tool records MP4 whenever the browser supports it and falls back to WebM otherwise. Support varies by browser and version, so if you get a WebM file, convert it with HandBrake or ffmpeg.
 
 ## Libraries
 
