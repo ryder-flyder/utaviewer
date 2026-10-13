@@ -88,6 +88,7 @@ function parseUSTX(text) {
       offs.push(vb);
       const rest = isRest(n.lyric), nn = mkNote(t0, t1, n.tone, rest ? 'R' : cleanLyric(n.lyric), offs);
       if (rest) nn.rest = true;
+      nn.u = { k: utauLyric(n.lyric), old: nn.lyric, oldRest: !!rest, raw: n.lyric };
       tracks[ti].notes.push(nn);
     }
   }
@@ -118,6 +119,7 @@ function parseUST(bytes) {
     if (!raw || isRest(raw)) continue;   // rests are skipped
     const rest = false;
     const tok = raw.split(/\s+/), lyr0 = rest ? 'R' : tok.length > 1 ? (/^r$/i.test(tok[tok.length - 1]) ? tok[0] : tok[tok.length - 1]) : raw, lyr = rest ? 'R' : cleanLyric(lyr0);
+    const uk = utauLyric(raw);
     const t0 = tm.t2s(r.tick), t1 = tm.t2s(r.tick + r.len), offs = [];
     if (kv.PBW && kv.PBW.trim()) {
       const parts = (kv.PBS || '0').split(';'), x0 = parseFloat(parts[0]) || 0, y0 = parseFloat(parts[1]) || 0;
@@ -129,6 +131,7 @@ function parseUST(bytes) {
     if (kv.VBR) { const v = kv.VBR.split(',').map(Number); offs.push(vibFn(t0, t1, { length: v[0], period: v[1], depth: v[2], in: v[3], out: v[4] })); }
     const nn = mkNote(t0, t1, parseInt(kv.NoteNum, 10) || 60, lyr, offs);
     if (rest) nn.rest = true;
+    nn.u = { k: uk, old: nn.lyric, oldRest: false, raw };
     notes.push(nn);
   }
   return { fmt: 'UST', title: (setting && setting.kv.ProjectName) || '', tm, tracks: [{ name: 'UST notes', notes }] };
@@ -204,8 +207,46 @@ function bendFn(tm, base, bends, sens) {
   return stepFn(xs, ys);
 }
 
+// UTAU lyrics hold more than the sung syllable: VCV ("a ka"), CVVC ("a k"), breaths, arrows and voice-color suffixes.
+// Returns what to show, and what kind of note it is: 'lyric', 'hold' (+ and -), 'conn' (a connector part that is not a syllable) or 'rest' (breath, R, symbols).
+const U_BREATH = /^(?:[aiueonN]?(?:息|吸)|ブレス|息継ぎ|br\d*|breath)$/i;
+const U_REST = /^(?:r|x|息|吸|ブレス|息継ぎ|br\d*|breath|sil|pau|cl|[-－]{2,}|[・･…\.。、,]+)$/i;
+const U_PRE = /^(?:[aiueo]|n|ng|m|N|ん|ン|[あいうえおアイウエオ]|[-－ー]|r|R|息|吸)$/;
+const U_CONS = /^(?:[kgsztdnhbpmyrwfvj]|ch|sh|ts|ny|hy|ky|gy|by|py|my|ry|dz|dj|kw|gw|ng|th|c|l|q|x|ʃ|ɕ|ʒ|ʤ|ɲ|ɾ|ŋ)$/i;
+function utauLyric(raw) {
+  let s = (raw || '').replace(/[↑↓⇧⇩↗↘]/g, '').replace(/^[?？]+/, '').trim();
+  if (!s) return { t: '', k: 'rest' };
+  if (/^[+\-~ー]~?$/.test(s)) return { t: s[0], k: 'hold' };
+  if (/^[\[(<（【《].*[\])>）】》]$/.test(s)) return { t: '', k: 'rest' };
+  let tok = s.split(/\s+/).map(x => x.replace(/[_＿].*$/, '').replace(/(?<=.)[A-G][#♯]?\d$/, '').replace(/(?<=[^\d])\d{1,2}$/, '')).filter(Boolean);
+  if (tok.some(x => U_BREATH.test(x))) return { t: '', k: 'rest' };
+  if (!tok.length) return { t: '', k: 'rest' };
+  if (tok.length === 1) {
+    const w = tok[0];
+    if (U_REST.test(w) || U_BREATH.test(w) || /^[\p{P}\p{S}]+$/u.test(w)) return { t: '', k: 'rest' };
+    return { t: w, k: 'lyric' };
+  }
+  // a trailing rest marker, or a lone consonant after a vowel or consonant, is only the connecting half of a part
+  const last = tok[tok.length - 1], first = tok[0];
+  if (U_REST.test(last)) return { t: '', k: 'conn' };
+  if (U_CONS.test(last) && (U_PRE.test(first) || U_CONS.test(first))) return { t: '', k: 'conn' };
+  let i = 0; while (i < tok.length - 1 && (U_PRE.test(tok[i]) || U_REST.test(tok[i]))) i++;
+  const rest = tok.slice(i).join(' ');
+  if (U_CONS.test(rest)) return { t: '', k: 'conn' };
+  return { t: rest, k: 'lyric' };
+}
+
 const cleanLyric = s => { s = (s || '').trim(); return /^[+\-]~?$/.test(s) ? s[0] : s; };
 const isRest = s => /^r$/i.test((s || '').trim());
+
+// tempo events moved back by `pre` ticks; whatever tempo is in force at the new start becomes the first one
+function shiftTempos(list, pre) {
+  if (!pre) return list;
+  const s = list.slice().sort((a, b) => a.tick - b.tick); let cur = null; const out = [];
+  for (const t of s) { if (t.tick <= pre) cur = t; else out.push({ tick: t.tick - pre, bpm: t.bpm }); }
+  if (cur) out.unshift({ tick: 0, bpm: cur.bpm });
+  return out;
+}
 
 function parseVSQX(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
@@ -213,7 +254,10 @@ function parseVSQX(text) {
   const mt = doc.getElementsByTagName('masterTrack')[0]; if (!mt) throw new Error('No masterTrack found');
   const res = parseInt(xmlTxt(mt, ['resolution']), 10) || 480;
   const tempos = Array.from(mt.children).filter(c => c.localName === 'tempo').map(c => ({ tick: parseInt(xmlTxt(c, ['posTick', 't']), 10) || 0, bpm: (parseFloat(xmlTxt(c, ['bpm', 'v'])) || 12000) / 100 }));
-  const tm = makeTempoMap(tempos.length ? tempos : [{ tick: 0, bpm: 120 }], res), tracks = [];
+  // the pre-measure is a count-in bar that rendered audio does not contain, so the song starts after it
+  const ts = Array.from(mt.children).find(c => c.localName === 'timeSig'), nu = ts ? parseInt(xmlTxt(ts, ['nu']), 10) || 4 : 4, de = ts ? parseInt(xmlTxt(ts, ['de']), 10) || 4 : 4;
+  const pre = Math.max(0, parseInt(xmlTxt(mt, ['preMeasure']), 10) || 0) * Math.round(res * 4 * nu / de);
+  const tm = makeTempoMap(shiftTempos(tempos.length ? tempos : [{ tick: 0, bpm: 120 }], pre), res), tracks = [];
   Array.from(doc.getElementsByTagName('vsTrack')).forEach((tr, i) => {
     const notes = [];
     for (const part of Array.from(tr.children).filter(c => c.localName === 'musicalPart' || c.localName === 'vsPart')) {
@@ -223,9 +267,9 @@ function parseVSQX(text) {
         const tk = parseInt(xmlTxt(cc, ['t', 'posTick']), 10) || 0, id = v.getAttribute('id'), val = parseFloat(v.textContent);
         if (id === 'P') bends.push([tk, val]); else if (id === 'S') sens.push([tk, val]);
       }
-      const bf = bendFn(tm, pp, bends, sens);
+      const bf = bendFn(tm, pp - pre, bends, sens);
       for (const n of Array.from(part.children).filter(c => c.localName === 'note')) {
-        const a = pp + (parseInt(xmlTxt(n, ['posTick', 't']), 10) || 0), d = parseInt(xmlTxt(n, ['durTick', 'dur', 'd']), 10) || 0, num = parseInt(xmlTxt(n, ['noteNum', 'n']), 10);
+        const a = pp - pre + (parseInt(xmlTxt(n, ['posTick', 't']), 10) || 0), d = parseInt(xmlTxt(n, ['durTick', 'dur', 'd']), 10) || 0, num = parseInt(xmlTxt(n, ['noteNum', 'n']), 10);
         if (!isFinite(num)) continue;
         notes.push(mkNote(tm.t2s(a), tm.t2s(a + d), num, cleanLyric(xmlTxt(n, ['lyric', 'y'])), [bf]));
       }
@@ -257,6 +301,24 @@ function svControlsFn(controls, off, tm) {
 }
 const SV_SPECIAL = /^(br|cl|sil|pau)$/i;
 
+// Synthesizer V note properties: depth in semitones, rate in Hz, start and fade times in seconds.
+// A depth of 0 means vibrato is off; a missing depth next to a rate or start means the default depth of 1.
+function svVibFn(n, t0, t1) {
+  const a = n.attributes; if (!a) return null;
+  const has = ['dF0Vbr', 'fF0Vbr', 'tF0VbrStart', 'tF0VbrLeft', 'tF0VbrRight', 'pF0Vbr'].some(k => a[k] != null); if (!has) return null;
+  const depth = a.dF0Vbr != null ? a.dF0Vbr : 1; if (!(Math.abs(depth) > 0)) return null;
+  const freq = a.fF0Vbr > 0 ? a.fF0Vbr : 5.5, start = a.tF0VbrStart != null ? Math.max(0, a.tF0VbrStart) : 0.25;
+  const fi = a.tF0VbrLeft != null ? Math.max(0, a.tF0VbrLeft) : 0.2, fo = a.tF0VbrRight != null ? Math.max(0, a.tF0VbrRight) : 0.2, ph = a.pF0Vbr || 0;
+  const vs = t0 + start; if (vs >= t1) return null;
+  return t => {
+    if (t < vs || t > t1) return 0;
+    let e = 1; const x = t - vs, y = t1 - t;
+    if (fi > 0 && x < fi) e = x / fi;
+    if (fo > 0 && y < fo) e = Math.min(e, y / fo);
+    return depth * e * Math.sin(2 * Math.PI * freq * x + ph);
+  };
+}
+
 function parseSVP(bytes) {
   const j = JSON.parse(decodeText(bytes).replace(/\0+$/, ''));
   const tempos = ((j.time && j.time.tempo) || [{ position: 0, bpm: 120 }]).map(t => ({ tick: t.position || 0, bpm: t.bpm }));
@@ -276,7 +338,8 @@ function parseSVP(bytes) {
         const p = n.pitch + shift + (n.detune || 0) / 100;
         const f = abs ? (t => { const v = abs(t); return v == null ? 0 : v + shift - p; }) : pf;
         const raw = (n.lyrics || '').trim(), phon = raw[0] === '.', lyric = cleanLyric(phon ? raw.slice(1) : raw);
-        const nn = mkNote(tm.t2s(a), tm.t2s(a + n.duration), p, lyric, [f]);
+        const s0 = tm.t2s(a), s1 = tm.t2s(a + n.duration);
+        const nn = mkNote(s0, s1, p, lyric, [f, svVibFn(n, s0, s1)]);
         if (SV_SPECIAL.test(raw)) nn.rest = true;
         notes.push(nn);
       }
@@ -432,7 +495,99 @@ function parseTSSLN(bytes) {
   return { fmt: 'TSSLN', title: '', tm: firstTm || makeTempoMap([{ tick: 0, bpm: 120 }], res), tracks };
 }
 
-const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project' };
+// VOCALOID 1/2 .vsq: a standard MIDI file whose vocal tracks carry an INI document, cut into "DM:0000:" text events
+function readSMF(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf);
+  if (u.length < 14 || String.fromCharCode(u[0], u[1], u[2], u[3]) !== 'MThd') throw new Error('Not a MIDI based file');
+  const div = dv.getUint16(12); if (div & 0x8000) throw new Error('SMPTE time division is not supported');
+  let p = 8 + dv.getUint32(4); const tracks = [], tempos = []; let sig = null;
+  while (p + 8 <= u.length) {
+    const id = String.fromCharCode(u[p], u[p + 1], u[p + 2], u[p + 3]), len = dv.getUint32(p + 4);
+    let q = p + 8; const end = Math.min(u.length, q + len); p = end;
+    if (id !== 'MTrk') continue;
+    const tr = { name: '', texts: [] }; let tick = 0, run = 0;
+    const vlq = () => { let v = 0, b; do { b = u[q++]; v = (v * 128) + (b & 127); } while ((b & 128) && q < end); return v; };
+    while (q < end) {
+      tick += vlq(); let st = u[q];
+      if (st < 0x80) st = run; else { q++; if (st < 0xF0) run = st; }
+      if (st === 0xFF) {
+        const type = u[q++], l = vlq(), d = u.subarray(q, q + l); q += l;
+        if (type === 0x51 && l === 3) tempos.push({ tick, bpm: 60000000 / ((d[0] << 16) | (d[1] << 8) | d[2]) });
+        else if (type === 0x58 && l >= 2 && !sig) sig = { nu: d[0] || 4, de: Math.pow(2, d[1]) || 4 };
+        else if (type === 0x03) tr.name = decodeText(d);
+        else if (type === 0x01) tr.texts.push(d);
+        else if (type === 0x2F) break;
+      } else if (st === 0xF0 || st === 0xF7) q += vlq();
+      else q += (st & 0xF0) === 0xC0 || (st & 0xF0) === 0xD0 ? 1 : 2;
+    }
+    tracks.push(tr);
+  }
+  return { div, tracks, tempos, sig: sig || { nu: 4, de: 4 } };
+}
+
+// splits the INI text into { section: { key: value } } (keys keep their order for the list sections)
+function parseIni(text) {
+  const out = {}; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim(); if (!line) continue;
+    const m = /^\[(.+)\]$/.exec(line);
+    if (m) { cur = out[m[1]] = []; continue; }
+    const i = line.indexOf('='); if (cur && i > 0) cur.push([line.slice(0, i), line.slice(i + 1)]);
+  }
+  return out;
+}
+const iniGet = (sec, k) => { if (!sec) return undefined; for (const [a, b] of sec) if (a === k) return b; };
+function firstCsv(v) {
+  const m = /^\s*"((?:[^"]|"")*)"/.exec(v || ''); if (m) return m[1].replace(/""/g, '"');
+  return (v || '').split(',')[0].trim();
+}
+
+function parseVSQ(buf) {
+  const smf = readSMF(buf), res = smf.div, tracks = [];
+  const bar = Math.round(res * 4 * smf.sig.nu / smf.sig.de);
+  let pre = 0, tm = null; const parsed = [];
+  smf.tracks.forEach((tr, i) => {
+    // the text events of one track, in order, with the "DM:0000:" tag taken off
+    const parts = [];
+    for (const d of tr.texts) {
+      if (d.length >= 8 && d[0] === 0x44 && d[1] === 0x4D && d[2] === 0x3A && d[7] === 0x3A) parts.push(d.subarray(8));
+    }
+    if (!parts.length) return;
+    const all = new Uint8Array(parts.reduce((n, a) => n + a.length, 0)); let o = 0; for (const a of parts) { all.set(a, o); o += a.length; }
+    const ini = parseIni(decodeText(all));
+    if (!ini.Common && !ini.EventList) return;
+    parsed.push({ i, ini, name: iniGet(ini.Common, 'Name') || tr.name });
+    if (!pre) pre = Math.max(0, parseInt(iniGet(ini.Master, 'PreMeasure'), 10) || 0) * bar;
+  });
+  if (!parsed.length) throw new Error('No VOCALOID data found in this file');
+  tm = makeTempoMap(shiftTempos(smf.tempos.length ? smf.tempos : [{ tick: 0, bpm: 120 }], pre), res);
+  for (const tr of parsed) {
+    const ini = tr.ini, notes = [], bends = [], sens = [];
+    for (const [k, v] of ini.PitchBendBPList || []) bends.push([(parseInt(k, 10) || 0) - pre, parseFloat(v) || 0]);
+    for (const [k, v] of ini.PitchBendSensBPList || []) sens.push([(parseInt(k, 10) || 0) - pre, parseFloat(v) || 0]);
+    const bf = bendFn(tm, 0, bends, sens);
+    for (const [k, v] of ini.EventList || []) {
+      const at = parseInt(k, 10), id = /^ID#\d+$/.test(v.trim()) ? v.trim() : null; if (!id || !isFinite(at)) continue;
+      const ev = ini[id]; if (!ev || iniGet(ev, 'Type') !== 'Anote') continue;
+      const len = parseInt(iniGet(ev, 'Length'), 10), num = parseInt(iniGet(ev, 'Note#'), 10); if (!(len > 0) || !isFinite(num)) continue;
+      const a = at - pre, lh = iniGet(ev, 'LyricHandle'), lyric = lh && ini[lh] ? firstCsv(iniGet(ini[lh], 'L0')) : '';
+      const t0 = tm.t2s(a), t1 = tm.t2s(a + len);
+      let vf = null; const vh = iniGet(ev, 'VibratoHandle');
+      if (vh && ini[vh]) {
+        // Vibrato depth and rate run 0..127. The exact curve is not documented, so this is an estimate of the normal vibrato.
+        const vs = ini[vh], vl = parseInt(iniGet(vs, 'Length'), 10) || len, delay = parseInt(iniGet(ev, 'VibratoDelay'), 10) || 0;
+        const depth = parseFloat(iniGet(vs, 'StartDepth')), rate = parseFloat(iniGet(vs, 'StartRate'));
+        const span = Math.max(0, Math.min(vl, len - delay));
+        if (span > 0 && depth > 0) vf = vibFn(t0, t1, { length: span / len * 100, period: 1000 / (3 + (isFinite(rate) ? rate : 50) / 127 * 6), depth: depth / 127 * 100, in: 10, out: 10 });
+      }
+      notes.push(mkNote(t0, t1, num, cleanLyric(lyric), [bf, vf]));
+    }
+    if (notes.length) { notes.sort((x, y) => x.t0 - y.t0); tracks.push({ name: tr.name || ('Track ' + tr.i), notes }); }
+  }
+  return { fmt: 'VSQ', title: '', tm, tracks };
+}
+
+const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsq: 'a VOCALOID 2 project', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project' };
 async function parseProjectFile(file, bendRange) {
   const ext = file.name.split('.').pop().toLowerCase(), buf = await file.arrayBuffer();
   if (!KIND[ext]) throw new Error('Unsupported file type .' + ext);
@@ -442,6 +597,7 @@ async function parseProjectFile(file, bendRange) {
     if (ext === 'ustx') r = parseUSTX(decodeText(new Uint8Array(buf)));
     else if (ext === 'ust') r = parseUST(new Uint8Array(buf));
     else if (ext === 'mid' || ext === 'midi') r = parseMIDI(buf, bendRange);
+    else if (ext === 'vsq') r = parseVSQ(buf);
     else if (ext === 'vsqx') r = parseVSQX(decodeText(new Uint8Array(buf)));
     else if (ext === 'vpr') r = await parseVPR(buf);
     else if (ext === 'svp') r = parseSVP(new Uint8Array(buf));

@@ -21,9 +21,10 @@
       <button class="btn" id="btnProj" type="button">Add project files</button>
       <button class="btn" id="btnAudio" type="button">Add audio</button>
       <button class="btn" id="btnTheme" type="button" title="Switch between automatic, light and dark">Theme: Auto</button>
+      <button class="btn" id="btnTips" type="button" aria-pressed="true">Tips: On</button>
       <button class="btn" id="btnHelp" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
       <button class="btn primary" id="btnExport" type="button">Export</button>
-      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsqx,.vpr,.svp,.ccs,.tssln">
+      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln">
       <input id="fileAudio" type="file" hidden accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a">
       <input id="filePort" type="file" hidden accept="image/*">
       <input id="fileBg" type="file" hidden accept="image/*,video/*">
@@ -32,60 +33,15 @@
     </div>
   </header>
 
-    <aside class="rail">
+    <aside class="rail" id="railL" aria-label="Editor">
       <div class="tabs" role="tablist">
-        <button role="tab" aria-selected="true" data-tab="proj" type="button">Projects</button>
-        <button role="tab" aria-selected="false" data-tab="fx" type="button">Effects</button>
-        <button role="tab" aria-selected="false" data-tab="look" type="button">Look</button>
-        <button role="tab" aria-selected="false" data-tab="vis" type="button">Visuals</button>
-        <button role="tab" aria-selected="false" data-tab="exp" type="button">Export</button>
+        <button role="tab" aria-selected="true" data-tab="proj" type="button">Editor</button>
       </div>
 
       <div class="pane" data-pane="proj">
         <div id="fileList"></div>
         <div id="audioBox"></div>
-        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsqx</code> <code>.vpr</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code></div>
-      </div>
-
-      <div class="pane" data-pane="fx" hidden id="fxPane"></div>
-
-      <div class="pane" data-pane="look" hidden>
-        <label class="chk" for="autoStyle"><input type="checkbox" id="autoStyle"><span>Match the style to the loaded file type</span></label>
-        <div class="sec">Viewer look</div>
-        <div class="seg" id="shade" role="group" aria-label="Viewer light or dark"><button class="btn small" type="button" data-v="dark">Dark</button><button class="btn small" type="button" data-v="light">Light</button></div>
-        <p class="hint" id="shadeHint"></p>
-        <div id="presetGroups"></div>
-        <div class="sec">Colors</div>
-        <div class="cgrid" id="colorGrid"></div>
-        <div class="sec">Track palette</div>
-        <div class="pal" id="palette"></div>
-        <div class="btns">
-          <button class="btn small" id="applyPal" type="button">Apply palette to tracks</button>
-          <button class="btn small" id="resetColors" type="button">Reset colors</button>
-          <button class="btn small" id="saveMine" type="button">Save as My theme</button>
-        </div>
-        <div class="sec">Frame</div>
-        <div class="row"><label for="size">Video size</label>
-          <select id="size">
-            <option value="960x540">960 × 540</option>
-            <option value="1280x720">1280 × 720</option>
-            <option value="1920x1080">1920 × 1080</option>
-            <option value="1440x1080">1440 × 1080 (4:3)</option>
-            <option value="1080x1920">1080 × 1920 (vertical)</option>
-            <option value="1080x1080">1080 × 1080 (square)</option>
-          </select></div>
-        <div class="row"><label for="caption">Caption</label><input id="caption" type="text" maxlength="80" placeholder="Song title, shown top left"></div>
-        <div class="sec">Share a theme</div>
-        <p class="hint">Saves the colors and effects of the current look as a small JSON file (portraits, backgrounds and lyrics are not included). Load one to add someone else's theme.</p>
-        <div class="row"><label for="themeName">Name</label><input id="themeName" type="text" maxlength="40" placeholder="My theme"></div>
-        <div class="btns">
-          <button class="btn small" id="themeSave" type="button">Save theme file</button>
-          <button class="btn small" id="themeLoad" type="button">Load theme file</button>
-          <button class="btn small" id="themeRemove" type="button" hidden>Remove this theme</button>
-        </div>
-      </div>
-
-      <div class="pane" data-pane="vis" hidden>
+        <div id="quick"></div>
         <div class="sec">Portraits</div>
         <p class="hint">One image per track, laid under the notes. Opacity, size and position are in Effects. Turn them on below.</p>
         <label class="chk" for="portShow"><input type="checkbox" id="portShow"><span>Show portraits</span></label>
@@ -115,6 +71,70 @@
         <textarea id="lyrText2" rows="5" spellcheck="false" hidden placeholder="One line for each lyric line, in the same order."></textarea>
         <label class="chk" for="lyrShow"><input type="checkbox" id="lyrShow"><span>Show the lyric box</span></label>
         <p class="hint" id="lyrInfo"></p>
+        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsq</code> <code>.vsqx</code> <code>.vpr</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code></div>
+      </div>
+
+    </aside>
+    <div class="rz" id="rzL" role="separator" aria-orientation="vertical" aria-label="Resize the left sidebar" tabindex="0"></div>
+  <section class="stage" aria-label="Preview">
+    <div class="screen" id="screen">
+      <canvas id="cv" width="1920" height="1080" aria-label="Piano roll preview"></canvas>
+      <div class="drop">Drop project or audio files</div>
+    </div>
+    <div class="transport">
+      <div class="tcL" id="tcInfo"></div>
+      <div class="ctrls">
+        <button class="tbtn" id="toStart" type="button" aria-label="Go to start"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM13 2v12L6 8z"/></svg></button>
+        <button class="tbtn" id="loopBtn" type="button" aria-pressed="false" aria-label="Loop" title="Loop a section: Shift-drag on the timeline, or press [ and ] at the playhead. R turns it on and off, Esc clears it."><svg viewBox="0 0 16 16"><path d="M3 7V6a3 3 0 0 1 3-3h5V1l3.5 3L11 7V5H6a1 1 0 0 0-1 1v1zM13 9v1a3 3 0 0 1-3 3H5v2L1.5 12 5 9v2h5a1 1 0 0 0 1-1V9z"/></svg></button>
+        <button class="tbtn play" id="play" type="button" aria-label="Play"><svg id="playIcon" viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></button>
+      </div>
+      <div class="tc"><span id="tNow">0:00.0</span> <small>/ <span id="tEnd">0:00.0</span></small></div>
+    </div>
+    <div class="status" id="msg" role="status"></div>
+  </section>
+    <div class="rz" id="rzR" role="separator" aria-orientation="vertical" aria-label="Resize the right sidebar" tabindex="0"></div>
+    <aside class="rail" id="railR" aria-label="Settings">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="fx" type="button">Effects</button>
+        <button role="tab" aria-selected="false" data-tab="look" type="button">Look</button>
+        <button role="tab" aria-selected="false" data-tab="exp" type="button">Export</button>
+      </div>
+      <div class="pane" data-pane="fx" id="fxPane"></div>
+
+      <div class="pane" data-pane="look" hidden>
+        <label class="chk" for="autoStyle"><input type="checkbox" id="autoStyle"><span>Match the style to the loaded file type</span></label>
+        <div class="sec">Viewer look</div>
+        <div class="seg" id="shade" role="group" aria-label="Viewer light or dark"><button class="btn small" type="button" data-v="dark">Dark</button><button class="btn small" type="button" data-v="light">Light</button></div>
+        <p class="hint" id="shadeHint"></p>
+        <div id="presetGroups"></div>
+        <div class="sec">Edit colors</div>
+        <div class="cgrid" id="colorGrid"></div>
+        <div class="sec">Track palette</div>
+        <div class="pal" id="palette"></div>
+        <div class="btns">
+          <button class="btn small" id="applyPal" type="button">Apply palette to tracks</button>
+          <button class="btn small" id="resetColors" type="button">Reset colors</button>
+          <button class="btn small" id="saveMine" type="button">Save as My theme</button>
+        </div>
+        <div class="sec">Frame</div>
+        <div class="row"><label for="size">Video size</label>
+          <select id="size">
+            <option value="960x540">960 × 540</option>
+            <option value="1280x720">1280 × 720</option>
+            <option value="1920x1080">1920 × 1080</option>
+            <option value="1440x1080">1440 × 1080 (4:3)</option>
+            <option value="1080x1920">1080 × 1920 (vertical)</option>
+            <option value="1080x1080">1080 × 1080 (square)</option>
+          </select></div>
+        <div class="row"><label for="caption">Caption</label><input id="caption" type="text" maxlength="80" placeholder="Song title, shown top left"></div>
+        <div class="sec">Share a theme</div>
+        <p class="hint">Saves the colors and effects of the current look as a small JSON file (portraits, backgrounds and lyrics are not included). Load one to add someone else's theme.</p>
+        <div class="row"><label for="themeName">Name</label><input id="themeName" type="text" maxlength="40" placeholder="My theme"></div>
+        <div class="btns">
+          <button class="btn small" id="themeSave" type="button">Save theme file</button>
+          <button class="btn small" id="themeLoad" type="button">Load theme file</button>
+          <button class="btn small" id="themeRemove" type="button" hidden>Remove this theme</button>
+        </div>
       </div>
 
       <div class="pane" data-pane="exp" hidden>
@@ -160,7 +180,7 @@
           <button class="btn small" id="qClear" type="button">Clear</button>
         </div>
         <div class="hint" id="qState"></div>
-        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsqx,.vpr,.svp,.ccs,.tssln,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
+        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
         <div class="result" id="result" hidden>
           <video id="resVideo" controls playsinline hidden></video>
           <div class="hint" id="resInfo"></div>
@@ -169,24 +189,10 @@
       </div>
     </aside>
 
-  <section class="stage" aria-label="Preview">
-    <div class="screen" id="screen">
-      <canvas id="cv" width="1920" height="1080" aria-label="Piano roll preview"></canvas>
-      <div class="drop">Drop project or audio files</div>
-    </div>
-    <div class="transport">
-      <div class="tcL" id="tcInfo"></div>
-      <div class="ctrls">
-        <button class="tbtn" id="toStart" type="button" aria-label="Go to start"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM13 2v12L6 8z"/></svg></button>
-        <button class="tbtn" id="loopBtn" type="button" aria-pressed="false" aria-label="Loop" title="Loop a section: Shift-drag on the timeline, or press [ and ] at the playhead. R turns it on and off, Esc clears it."><svg viewBox="0 0 16 16"><path d="M3 7V6a3 3 0 0 1 3-3h5V1l3.5 3L11 7V5H6a1 1 0 0 0-1 1v1zM13 9v1a3 3 0 0 1-3 3H5v2L1.5 12 5 9v2h5a1 1 0 0 0 1-1V9z"/></svg></button>
-        <button class="tbtn play" id="play" type="button" aria-label="Play"><svg id="playIcon" viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></button>
-      </div>
-      <div class="tc"><span id="tNow">0:00.0</span> <small>/ <span id="tEnd">0:00.0</span></small></div>
-    </div>
-    <div class="status" id="msg" role="status"></div>
-  </section>
+
 
   <section class="tl" aria-label="Timeline">
+    <div class="rz h" id="rzT" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" tabindex="0"></div>
     <div class="tlbar"><span>Timeline</span><label>Zoom <input type="range" id="tlZoom" min="0" max="100" value="0" aria-label="Timeline zoom"></label></div>
     <div class="tlscroll" id="tlScroll">
       <div class="tlgrid">
@@ -202,6 +208,7 @@
   <h2>Keyboard shortcuts</h2>
   <dl>
     <dt>Space</dt><dd>Play or pause</dd>
+    <dt>Drag audio</dt><dd>Slide the audio lane on the timeline (snaps to beats and notes; hold Alt to move freely)</dd>
     <dt>← →</dt><dd>Back or forward 2 s (Shift: 10 s)</dd>
     <dt>Home / End</dt><dd>Jump to start or end</dd>
     <dt>+ / −</dt><dd>Zoom the piano roll in or out</dd>
@@ -209,7 +216,7 @@
     <dt>L</dt><dd>Show or hide the lyric box</dd>
     <dt>[ and ]</dt><dd>Loop start and end at the playhead</dd>
     <dt>R / Esc</dt><dd>Loop on or off / clear the loop</dd>
-    <dt>1 – 5</dt><dd>Projects, Effects, Look, Visuals, Export</dd>
+    <dt>1 – 4</dt><dd>Editor, Effects, Look, Export</dd>
     <dt>?</dt><dd>This list</dd>
   </dl>
   <form method="dialog"><button class="btn primary" type="submit">Close</button></form>

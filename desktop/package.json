@@ -1,7 +1,7 @@
 {
   "name": "utaviewer-desktop",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Windows desktop build of UtaViewer",
   "scripts": {
     "build": "node build.js"

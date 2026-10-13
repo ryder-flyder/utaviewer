@@ -5,17 +5,20 @@
   const STAMP = /^\s*\[(\d+):(\d+(?:\.\d+)?)\]/;
 
   // Group a track's notes into phrases, splitting on silences. "+" and "-" notes only hold the previous syllable.
-  function phrases(track, shift, gap) {
+  function phrases(track, shift, gap, ov) {
     gap = gap || 0.7;
-    const notes = track.notes.filter(n => !n.rest).map(n => ({ t0: n.t0 + shift, t1: n.t1 + shift, lyric: (n.lyric || '').trim() }));
+    const notes = track.notes.filter(n => !n.rest).map(n => ({ t0: n.t0 + shift, t1: n.t1 + shift, lyric: (n.lyric || '').trim(), src: n }));
     notes.sort((a, b) => a.t0 - b.t0);
     const out = []; let cur = null, last = -1e9;
     for (const n of notes) {
+      if (n.src.conn) continue;   // connector parts of UTAU aliases are not syllables
       if (!cur || n.t0 - last > gap || cur.count >= 10) { cur = { t0: n.t0, t1: n.t1, syl: [], count: 0 }; out.push(cur); }
       cur.count++; cur.t1 = Math.max(cur.t1, n.t1); last = Math.max(last, n.t1);
       if (!n.lyric) continue;
-      if (/^[+\-ー~]$/.test(n.lyric)) { const s = cur.syl[cur.syl.length - 1]; if (s) s.t1 = n.t1; continue; }
-      cur.syl.push({ text: n.lyric, t0: n.t0, t1: n.t1 });
+      // `ov` can replace what a note shows (an empty replacement hides it, and the syllable is kept so it can be brought back)
+      let ly = n.lyric; if (ov) { const o = ov(n.src); if (o !== undefined) ly = String(o).trim(); }
+      if (ly && /^[+\-ー~]$/.test(ly)) { const s = cur.syl[cur.syl.length - 1]; if (s) s.t1 = n.t1; continue; }
+      cur.syl.push({ text: ly, t0: n.t0, t1: n.t1, n: n.src, orig: n.lyric });
     }
     return out.filter(p => p.syl.length);
   }
@@ -57,7 +60,7 @@
   function buildLines(mode, ph, text, duration) {
     const lines = [];
     if (mode === 'notes') {
-      for (const p of ph) lines.push({ t0: p.t0, t1: p.t1, tokens: p.syl.map(s => ({ text: s.text, t: s.t0, gap: false })), join: joiner(p.syl.map(s => s.text)) });
+      for (const p of ph) lines.push({ t0: p.t0, t1: p.t1, tokens: p.syl.map(s => ({ text: s.text, t: s.t0, gap: false, n: s.n, orig: s.orig })), join: joiner(p.syl.map(s => s.text)) });
       return lines;
     }
     const lrc = parseLRC(text || '');

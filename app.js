@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const $ = (s, r = document) => r.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function h(tag, props, ...kids) {
@@ -33,35 +33,226 @@ const PRESETS = {
   'CeVIO AI': { g: 'Editors', bg1: '#2b2b2b', bg2: '#262626', grid: '#101010', rowW: '#4e4e4e', rowWA: 1, rowB: '#4e4e4e', rowBA: 1, rows: ['#6f93cf', '#4e4e4e', '#7ba37a', '#4e4e4e', '#b1a85f', '#b88b5d', '#4e4e4e', '#c88583', '#4e4e4e', '#8266a8', '#4e4e4e', '#5b67ab'], rowTintA: 1, keyW: '#ffffff', keyB: '#2a2a2a', fg: '#f4f4f4', play: '#ffffff', hi: '#fffbd0', act: '#ffffff', pitch: '#ff6a2a', edge: '#b3a817', palette: ['#f2e432', '#ff8f4a', '#7fd6ff', '#9ee07a', '#e68fd0', '#c9b6ff'], fx: { glow: 0, sparks: false, round: 0, noteH: 96, outline: 1, pitchMode: 'always', pitchW: 2, dim: 30 } },
   'VoiSona': { g: 'Editors', bg1: '#0d0e13', bg2: '#0b0c10', grid: '#c8c8d4', rowW: '#000000', rowWA: 0, rowB: '#000000', rowBA: 0.35, rows: ['#c98a8a', '#14151b', '#6fa06f', '#14151b', '#5a8fb0', '#9a7ac0', '#14151b', '#b06a8a', '#14151b', '#7a6ac0', '#14151b', '#6a9a9a'], rowTintA: 0.34, keyW: '#fafafa', keyB: '#101114', fg: '#f2f2f6', play: '#f7931e', hi: '#fff0d0', act: '#ffffff', pitch: '#ffe0a8', edge: '', palette: ['#ff9a1f', '#4ad0c0', '#7aa2ff', '#ff7aa8', '#b69cff', '#9be07a'], fx: { glow: 0, sparks: false, round: 6, noteH: 94, outline: 0, pitchMode: 'always', pitchW: 1.8, dim: 35 } },
   'OpenUtau': { g: 'Editors', bg1: '#ffffff', bg2: '#f7f7f9', grid: '#8d8d9a', rowW: '#fbfbfc', rowWA: 1, rowB: '#ececf0', rowBA: 1, keyW: '#ffffff', keyB: '#ff4f8b', fg: '#2a2a33', play: '#6c6c7a', hi: '#d6ecff', act: '#0f5fa8', pitch: '#ff3d7f', edge: '', palette: ['#4da3e8', '#ff6aa0', '#5cc48a', '#f2a93b', '#9b7be0', '#35b9c9'], fx: { glow: 0, sparks: false, round: 6, noteH: 88, outline: 0, pitchMode: 'always', pitchW: 1.6, dim: 25 } },
-  'Mono': { g: 'Moods', bg1: '#0f0f10', bg2: '#1a1a1c', grid: '#bbbbbb', rowW: '#000000', rowWA: 0, rowB: '#ffffff', rowBA: 0.05, keyW: '#d8d8d8', keyB: '#161617', fg: '#f0f0f0', play: '#ffffff', hi: '#ffffff', act: '#ffffff', pitch: '', edge: '', palette: ['#f2f2f2', '#9c9c9c', '#cfcfcf', '#6f6f6f'], fx: { ...SHOW } }
 };
-const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default' };
-// colour themes named after vocal synth characters, built from one accent and a palette
+const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQ: 'VOCALOID 4', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default' };
+// colour helpers: themes are built in HSL so the light versions stay vivid instead of turning muddy
 const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+const hslOf = x => {
+  const [r, g, b] = hex2rgb(x).map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, sat = 0;
+  if (mx !== mn) { const d = mx - mn; sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+  return [h, sat, l];
+};
+const hsl2hex = (h, sat, l) => {
+  h = ((h % 360) + 360) % 360; sat = clamp(sat, 0, 1); l = clamp(l, 0, 1); const k = sat * Math.min(l, 1 - l), f = n => { const t = (n + h / 30) % 12; return l - k * Math.max(-1, Math.min(t - 3, 9 - t, 1)); };
+  return toHex([f(0), f(8), f(4)].map(v => Math.round(v * 255)));
+};
+// a color made readable on a light page: saturated, mid lightness (yellows need to go a little darker to hold their shape)
+const forLight = x => { const [h, sat, l] = hslOf(x); return hsl2hex(h, Math.max(sat, 0.6), clamp(l, 0.4, h > 38 && h < 75 ? 0.5 : h >= 75 && h < 170 ? 0.44 : 0.57)); };
+const forLightMix = (x, l, sat) => { const [h, s0] = hslOf(x); return hsl2hex(h, sat == null ? Math.max(s0, 0.6) : sat, l < 0.5 && h > 20 && h < 75 ? l + 0.08 : l); };
+// every theme palette has the same roles in the same order: main, partner, accent, light tint, deep shade, white (or dark ink on light themes)
+const darkPalette = (c, partner, accent) => [c, partner, accent, toHex(mixc(c, '#ffffff', 0.6)), toHex(mixc(c, '#000000', 0.35)), '#ffffff'];
+const lightPalette = (c, partner, accent) => [forLight(c), forLight(partner), forLight(accent), forLightMix(c, 0.76), forLightMix(c, 0.3), '#24242c'];
+const lightBase = (c, shadeP) => {
+  const [h, sat] = hslOf(c), main = forLight(c);
+  return { bg1: hsl2hex(h, 0.5, 0.985), bg2: hsl2hex(h, 0.4, 0.95), grid: hsl2hex(h, 0.1, 0.58), rowW: '#000000', rowWA: 0, rowB: '#000000', rowBA: 0.035, keyW: '#ffffff', keyB: hsl2hex(h, 0.25, 0.22), fg: hsl2hex(h, 0.3, 0.14), play: forLightMix(c, 0.38), hi: forLightMix(c, 0.4), act: forLightMix(c, 0.34), palette: shadeP };
+};
 const CHARS = [
-  ['Miku', '#39c5bb', '#051a1d', '#0b2f33', ['#39c5bb', '#ff6fae', '#8ff0e8', '#ffffff', '#1f8f93', '#ffc4de']],
-  ['Kagamine', '#ffc928', '#1a1405', '#2d2308', ['#ffc928', '#ff8f2e', '#fff0a0', '#ffffff', '#e0a010', '#5b6b8a']],
-  ['Luka', '#ff9ec4', '#1d0d16', '#301424', ['#ff9ec4', '#ffd2e4', '#e8b84a', '#ffffff', '#e05a92', '#7fd6ff']],
-  ['MEIKO', '#e0313b', '#1c080b', '#2e0f14', ['#e0313b', '#ff7a6a', '#ffd0c8', '#ffffff', '#a01e2a', '#6a3a2a']],
-  ['KAITO', '#3d6ff0', '#070d22', '#0e1a3e', ['#3d6ff0', '#8fb4ff', '#ffffff', '#2b3f8a', '#7fe0ff', '#c8d8ff']],
-  ['GUMI', '#8be04d', '#0c1a08', '#162b0e', ['#8be04d', '#ff9a3d', '#d8ffb0', '#ffffff', '#4fa02a', '#ffd27a']],
-  ['Teto', '#e8334f', '#1b080d', '#2d0f17', ['#e8334f', '#ff8696', '#ffffff', '#9a1f36', '#ffc2c9', '#6a2a3a']],
-  ['Yukari', '#a37cf0', '#120b21', '#1e1238', ['#a37cf0', '#d6b8ff', '#ff9ad0', '#ffffff', '#6a4cc0', '#9ad8ff']],
+  // name, main color, background top, background bottom, partner color, accent (a third color that sits well with the other two)
+  ['Hatsune Miku', '#39c5bb', '#051a1d', '#0b2f33', '#ff6fae', '#4a9df0'],
+  ['Kagamine Rin', '#ff8a1f', '#1a0d04', '#2e1707', '#ffb830', '#ff5a36'],
+  ['Kagamine Len', '#ffd93a', '#15130a', '#25210e', '#f2a900', '#cfe03a'],
+  ['Megurine Luka', '#ff9ec4', '#1d0d16', '#301424', '#e8b84a', '#7aa8ff'],
+  ['MEIKO', '#e0313b', '#1c080b', '#2e0f14', '#ff8a5c', '#ffc04d'],
+  ['KAITO', '#3d6ff0', '#070d22', '#0e1a3e', '#6fd2ff', '#8a7cff'],
+  ['Megpoid GUMI', '#8be04d', '#0c1a08', '#162b0e', '#ff9a3d', '#3fd0a0'],
+  ['Kasane Teto', '#e8334f', '#1b080d', '#2d0f17', '#ffb347', '#ff8aa0'],
+  ['Yuzuki Yukari', '#a37cf0', '#120b21', '#1e1238', '#ff8ad0', '#6fb0ff'],
 ];
-for (const [name, c, b1, b2, pal] of CHARS) {
-  PRESETS[name] = Object.assign({}, PRESETS.Default, { g: 'Characters', bg1: b1, bg2: b2, grid: c, rowB: c, keyW: toHex(mixc(c, '#ffffff', 0.86)), keyB: b1, fg: toHex(mixc(c, '#ffffff', 0.9)), hi: toHex(mixc(c, '#ffffff', 0.75)), palette: pal, fx: { ...SHOW } });
-  // light variant: pale tinted paper, darker accents so notes stay readable
-  const dk = (x, t) => toHex(mixc(x, '#000000', t));
-  PRESETS[name].alt = Object.assign({}, PRESETS[name], {
-    bg1: toHex(mixc(c, '#ffffff', 0.94)), bg2: toHex(mixc(c, '#ffffff', 0.86)), grid: dk(c, 0.3), rowB: dk(c, 0.3), rowBA: 0.07,
-    keyW: '#ffffff', keyB: dk(c, 0.62), fg: dk(c, 0.72), play: dk(c, 0.55), hi: dk(c, 0.5), act: dk(c, 0.35),
-    palette: pal.map(p => lum(p) > 0.8 ? dk(c, 0.45) : lum(p) > 0.62 ? dk(p, 0.3) : p), fx: { ...SHOW, glow: 5 }
-  });
+for (const [name, c, b1, b2, partner, accent] of CHARS) {
+  PRESETS[name] = Object.assign({}, PRESETS.Default, { g: 'Characters', bg1: b1, bg2: b2, grid: c, rowB: c, keyW: toHex(mixc(c, '#ffffff', 0.86)), keyB: b1, fg: toHex(mixc(c, '#ffffff', 0.9)), hi: toHex(mixc(c, '#ffffff', 0.75)), palette: darkPalette(c, partner, accent), fx: { ...SHOW } });
+  PRESETS[name].alt = Object.assign({}, PRESETS[name], lightBase(c, lightPalette(c, partner, accent)), { fx: { ...SHOW, glow: 4 } });
 }
+// plain colour themes: a sleek black or white page with one colour, plus two neighbouring hues for the other tracks
+const COLORS = [['Mono', null], ['Red', '#ff4d5e'], ['Orange', '#ff8a3d'], ['Yellow', '#ffd23f'], ['Green', '#4fd88a'], ['Teal', '#2fd4c0'], ['Cyan', '#3fc8ff'], ['Blue', '#5b86ff'], ['Violet', '#9b7bff'], ['Pink', '#ff6fae']];
+for (const [cn, c] of COLORS) {
+  const mx = (a, b, t) => toHex(mixc(a, b, t)), slim = { ...SHOW, glow: 8, round: 14 };
+  let darkP, lightP, a = c || '#e6e6ea', la = c ? forLight(c) : '#2a2a32';
+  if (c) { const [h, sat, l] = hslOf(c), p = hsl2hex(h + 32, sat, l), q = hsl2hex(h - 32, sat, l); darkP = darkPalette(c, p, q); lightP = lightPalette(c, p, q); }
+  else { darkP = ['#f2f2f5', '#a8a8b2', '#7c7c86', '#d6d6dc', '#4a4a52', '#ffffff']; lightP = ['#24242c', '#5c5c66', '#8c8c96', '#44444c', '#16161c', '#24242c']; }
+  PRESETS['Black ' + cn] = Object.assign({}, PRESETS.Default, { g: 'Colors', label: cn, shade: 'Black', bg1: '#08080a', bg2: '#131317', grid: '#8a8a94', rowW: '#000000', rowWA: 0, rowB: '#ffffff', rowBA: 0.045, keyW: '#e8e8ec', keyB: '#0a0a0c', fg: '#f1f1f4', play: mx(a, '#ffffff', 0.35), hi: mx(a, '#ffffff', 0.75), act: mx(a, '#ffffff', 0.55), pitch: '', edge: '', palette: darkP, fx: slim });
+  PRESETS['White ' + cn] = Object.assign({}, PRESETS.Default, { g: 'Colors', label: cn, shade: 'White', bg1: '#ffffff', bg2: '#f3f3f6', grid: '#8a8a96', rowW: '#ffffff', rowWA: 1, rowB: '#000000', rowBA: 0.04, keyW: '#ffffff', keyB: '#1b1b22', fg: '#14141a', play: c ? forLightMix(c, 0.38) : '#24242c', hi: c ? forLightMix(c, 0.4) : '#16161c', act: c ? forLightMix(c, 0.34) : '#24242c', pitch: '', edge: '', palette: lightP, fx: { ...slim, glow: 3 } });
+}
+// names from earlier versions
+const OLD_NAMES = { Miku: 'Hatsune Miku', Kagamine: 'Kagamine Rin', Luka: 'Megurine Luka', GUMI: 'Megpoid GUMI', Teto: 'Kasane Teto', Yukari: 'Yuzuki Yukari', Mono: 'Black Mono' };
 const presetOf = name => { const b = PRESETS[name] || PRESETS.Default; return look.shade === 'light' && b.alt ? b.alt : b; };
 const BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+// text styles. Only fonts that ship with the operating system are used, so what you see is what the export records.
+const FONT = '"Instrument Sans","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+const FONTS = {
+  sans: FONT,
+  round: '"Hiragino Maru Gothic ProN","Arial Rounded MT Bold","Yu Gothic UI","Noto Sans JP",sans-serif',
+  serif: 'Georgia,"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Times New Roman",serif',
+  mono: 'ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Courier New",monospace',
+  display: 'Impact,Haettenschweiler,"Arial Narrow Bold","Hiragino Kaku Gothic Std","Yu Gothic UI",sans-serif',
+  script: '"Segoe Script","Bradley Hand","Snell Roundhand","Comic Sans MS","Hiragino Maru Gothic ProN",cursive'
+};
+const FONT_OPTS = [['sans', 'Clean sans (default)'], ['round', 'Rounded'], ['serif', 'Serif'], ['mono', 'Monospace'], ['display', 'Heavy condensed'], ['script', 'Handwriting']];
+const WEIGHTS = [['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['650', 'Bold'], ['700', 'Extra bold'], ['800', 'Heavy']];
+const CASES = [['asis', 'As written'], ['upper', 'UPPERCASE'], ['lower', 'lowercase'], ['title', 'Capitalized']];
+const caseOf = (t, m) => m === 'upper' ? t.toUpperCase() : m === 'lower' ? t.toLowerCase() : m === 'title' ? t.replace(/(^|[\s\-'])(\p{L})/gu, (a, b, c) => b + c.toUpperCase()) : t;
+
+const TIPS = {
+  highlight: 'Brightens the note that is being sung right now.',
+  flash: 'A quick flash on each note the moment it starts.',
+  progress: 'Fills each note from left to right as it plays.',
+  glow: 'Soft light around the notes, the pitch line and the playhead. Set to 0 for a flat look.',
+  glowColor: 'Which color the glow uses.',
+  sparks: 'Little particles that fly off the playhead on every new note.',
+  pulse: 'The playhead swells on each beat of the song’s tempo.',
+  pitch: 'Draws the pitch curve of the singing as a line over the notes.',
+  pitchMode: 'How the curve appears: drawn as it plays, shown in full, or as a fading trail.',
+  pitchColor: 'Use the theme’s pitch color, a lighter tint of each track, or the track color itself.',
+  pitchW: 'Thickness of the pitch line.',
+  lineGap: 'Notes closer together than this share one unbroken pitch line. Set to 0 to break the line at every gap.',
+  trail: 'How long the fading trail stays behind the playhead.',
+  head: 'A dot where the pitch line meets the playhead.',
+  bend: 'How many semitones a full pitch bend moves, for MIDI files. Applies to files added after you change it.',
+  lyrics: 'Show each note’s lyric on the piano roll.',
+  lyricMode: 'Put the lyric inside the note, above it, or inside when it fits and above when it does not.',
+  lyricSize: 'Size of the lyrics on the notes.',
+  lyFont: 'Typeface for the lyrics on the notes. These come with your system, so how they look depends on your computer.',
+  lyWeight: 'How thick the letters are.',
+  lyItalic: 'Slant the lyrics.',
+  lyCase: 'Show lyrics as written, in capitals, in small letters, or with capital first letters.',
+  lySpacing: 'Space between letters.',
+  lyColor: 'Automatic picks black or white to suit each note. Or use the theme text color or your own.',
+  lyColorC: 'Pick the color for all note lyrics.',
+  lyOut: 'An edge around the letters, light on dark text and dark on light text. Helps on busy backgrounds.',
+  lyShadow: 'A soft shadow under the lyrics.',
+  lyrPos: 'Which corner the lyric box sits in.',
+  lyrSize: 'Size of the whole lyric box.',
+  lyrKaraoke: 'Words change color as they are sung.',
+  lbKStyle: 'How the lyric box shows which word is being sung.',
+  lbUnsung: 'How visible words are before they are sung. Lower is fainter.',
+  lyrBox: 'A panel behind the lyric box text. Turn off to draw plain text.',
+  lyrNext: 'Shows the coming line in small type under the current one.',
+  lyrRoll: 'Use the lyric edits you made note by note on the piano roll as well. Off keeps the roll showing the project’s own lyrics.',
+  lbFont: 'Typeface for the lyric box. These come with your system, so how they look depends on your computer.',
+  lbWeight: 'How thick the letters are.',
+  lbItalic: 'Slant the lyric box text.',
+  lbCase: 'Show the text as written, in capitals, in small letters, or with capital first letters.',
+  lbSpacing: 'Space between letters.',
+  lbAlign: 'Line up the text to the left, center or right of the box.',
+  lbLine: 'Space between lines of text.',
+  lbSec: 'Size of the second line (romaji or typed) compared with the main line.',
+  lbColor: 'Color of words that are not sung yet.',
+  lbColorC: 'Pick the color for lyric box text.',
+  lbLit: 'Color of words once they are sung.',
+  lbLitC: 'Pick the color for sung words.',
+  lbOut: 'An edge around the letters, light on dark text and dark on light text.',
+  lbShadow: 'A soft shadow under the text. Always on when the panel is off.',
+  lbPanel: 'Color of the panel behind the text.',
+  lbPanelC: 'Pick the panel color.',
+  lbPanelA: 'How see-through the panel is. 0 hides it, 100 is solid.',
+  lbRadius: 'How round the panel corners are.',
+  lbPad: 'Space between the text and the panel edge.',
+  portShow: 'Show a character image behind the notes.',
+  portOpacity: 'How see-through the portraits are.',
+  portSize: 'Portrait height as a share of the video height.',
+  portPos: 'Which side the portrait sits on.',
+  portReact: 'Portraits get a little brighter while their track is singing.',
+  bgDim: 'Darkens the background image or video so the notes stand out.',
+  bgBlur: 'Blurs the background image or video.',
+  wfStyle: 'An audio visualizer drawn from the audio file you add. One style at a time.',
+  wfColor: 'Use the theme palette or two colors of your own.',
+  wfColA: 'Color for lines and the low end.',
+  wfColB: 'Color for peaks and tops.',
+  wfOpacity: 'How see-through the visualizer is.',
+  wfGain: 'How strongly the visualizer reacts to the audio.',
+  wfOver: 'Draw the visualizer on top of the notes instead of behind them.',
+  wfScopeW: 'Thickness of the scope line.',
+  wfScopeY: 'Where the scope line sits, from top to bottom.',
+  wfBarN: 'How many bars the spectrum has.',
+  utauClean: 'UST and USTX lyrics often hold more than the syllable: VCV parts like "a ka", CVVC parts like "a k", breaths and arrows. When this is on, only the sung syllable is shown on the notes and in the lyric box. Other file types are not affected.',
+  pvQ: 'How sharp the preview is. Lower is smoother on slower computers. Videos are always recorded at the full video size.',
+  pvFps: 'Draw the preview 30 times a second instead of matching the screen. Recorded video is not affected.',
+  pvLite: 'Turns off glow in the preview only, which is the heaviest effect. Recorded video still uses your glow setting.',
+  wfW: 'How wide the visualizer is. Lower it to make it smaller.',
+  wfH: 'How tall the visualizer area is. Lower it to make it smaller.',
+  wfPX: 'Slide the visualizer left or right inside the view.',
+  wfPY: 'Slide the visualizer up or down inside the view.',
+  wfBarH: 'How tall the bars can grow.',
+  wfBarPos: 'Bars grow from the bottom, the top or the middle.',
+  wfKeyLen: 'How far the piano-key spectrum reaches across the view.',
+  wfKeySide: 'Grow the piano-key spectrum from the keys or from the right edge.',
+  noteH: 'How tall each note bar is compared with its row.',
+  round: 'How round the note corners are.',
+  outline: 'Thickness of the edge around each note.',
+  dim: 'How much notes fade once they have been sung.',
+  rows: 'Shade alternate rows like piano keys.',
+  rowTint: 'Color each pitch class (C, D, E, ...) in styles that have it.',
+  window: 'How many seconds of music are on screen at once. Shortcuts: + and -.',
+  playPos: 'Where the playhead sits across the view.',
+  pad: 'Extra rows above and below the highest and lowest notes.',
+  gridDiv: 'How finely the vertical grid is cut.',
+  follow: 'Moves the view up and down to keep the notes on screen.',
+  followSens: 'How far the notes have to move before the view follows.',
+  followRows: 'How many rows stay visible while following.',
+  keys: 'Show the piano keys on the left.',
+  grid: 'Show the vertical grid lines.'
+};
+// hints for fixed parts of the page, by selector
+const STATIC_TIPS = [
+  ['#btnProj', 'Add vocal synth project files. UST files can be layered together; other formats replace the one that is loaded.'],
+  ['#btnAudio', 'Add the song audio. It plays with the roll, goes into the exported video and drives the visualizer.'],
+  ['#btnTheme', 'Switch the app between automatic, light and dark. This does not change the piano roll’s look.'],
+  ['#btnHelp', 'Keyboard shortcuts (?)'],
+  ['#btnTips', 'Turn these hover hints on or off.'],
+  ['#btnExport', 'Go to the Export tab to record a video.'],
+  ['#rzL', 'Drag to resize the left sidebar. Double-click to reset.'],
+  ['#rzT', 'Drag to resize the timeline. Double-click to reset.'],
+  ['#rzR', 'Drag to resize the right sidebar. Double-click to reset.'],
+  ['.tabs [data-tab=proj]', 'Files, tracks, portraits, background, lyric box and the settings you reach for most. Key: 1'],
+  ['.tabs [data-tab=fx]', 'Every effect and text option. Key: 2'],
+  ['.tabs [data-tab=look]', 'Themes, colors, theme files and the video frame. Key: 3'],
+  ['.tabs [data-tab=exp]', 'Record a video or render a queue of songs. Key: 4'],
+  ['#tlBody', 'Click to move the playhead. Drag the audio lane to slide the audio (it snaps to beats and notes; hold Alt to move freely). Shift-drag sets a loop.'],
+  ['#toStart', 'Back to the start. Key: Home'],
+  ['#play', 'Play or pause. Key: Space'],
+  ['#tlZoom', 'Zoom the timeline. Shift-drag on the timeline to set a loop.'],
+  ['label[for=autoStyle]', 'When on, loading a file switches to the style of the program that made it.'],
+  ['#shade', 'Dark or light version of the piano roll. Only available for character themes.'],
+  ['#applyPal', 'Give every track a color from the palette again, undoing colors you picked by hand.'],
+  ['#resetColors', 'Back to the colors of the chosen theme.'],
+  ['#saveMine', 'Keep the current look as “My theme” in this browser.'],
+  ['#size', 'Resolution of the preview and the exported video.'],
+  ['#caption', 'A title shown in the top left of the video.'],
+  ['#themeName', 'Name stored inside the theme file.'],
+  ['#themeSave', 'Save the colors and effects as a small file you can share.'],
+  ['#themeLoad', 'Add a theme file someone sent you.'],
+  ['#themeRemove', 'Delete this theme from your list.'],
+  ['label[for=portShow]', 'Show a character image behind the notes. Opacity and size are in Effects.'],
+  ['#lyrSrc', 'Where the lyric box gets its text: the notes, or text you type.'],
+  ['#lyrTrack', 'Which track the lyric box follows.'],
+  ['#lyrText', 'One line per phrase. Start a line with [mm:ss.xx] to time it exactly.'],
+  ['#lyrFile', 'Load lyrics from a .txt or .lrc file.'],
+  ['#lyrClear', 'Empty the text box.'],
+  ['#lyr2', 'A second line under the lyrics, such as romaji or a translation.'],
+  ['label[for=lyrShow]', 'Show the lyric box on the video. Key: L'],
+  ['#bgMode', 'Normal, transparent (WebM with alpha) or green screen for editing software.'],
+  ['#aspect', 'Shape of the video.'],
+  ['#expFrom', 'Start the recording here instead of at the beginning.'],
+  ['#expTo', 'End the recording here instead of at the end.'],
+  ['#fps', 'Frames per second of the recording.'],
+  ['#mbps', 'Higher quality makes a bigger file.'],
+  ['#rec', 'Plays the project once in real time and records it. Keep this tab open until it finishes.'],
+  ['label[for=qCaption]', 'Put each file’s name in the top left of its video.'],
+  ['#qAdd', 'Add project files, and audio files with the same names, to render in one go.'],
+  ['#qRun', 'Render every file in the list one after another with the current look.'],
+  ['#qClear', 'Empty the list.']
+];
 // state
 const FXDEF = [
   { sec: 'Playback' },
@@ -77,19 +268,58 @@ const FXDEF = [
   { k: 'pitchMode', t: 'select', l: 'Drawing style', opts: [['reveal', 'Reveal as it plays'], ['always', 'Full curve, traced bright'], ['static', 'Full curve, always visible'], ['trail', 'Fading trail']] },
   { k: 'pitchColor', t: 'select', l: 'Curve color', opts: [['theme', 'Theme pitch color'], ['tint', 'Tinted track color'], ['track', 'Track color']] },
   { k: 'pitchW', t: 'range', l: 'Line width', min: 1, max: 10, step: 0.5, u: 'px' },
+  { k: 'lineGap', t: 'range', l: 'Join notes closer than', min: 0, max: 1.5, step: 0.05, u: 's' },
   { k: 'trail', t: 'range', l: 'Trail length', min: 0.2, max: 4, step: 0.1, u: 's' },
   { k: 'head', t: 'toggle', l: 'Dot at the pitch head' },
   { k: 'bend', t: 'range', l: 'MIDI bend range', min: 1, max: 24, step: 1, u: 'st', reload: true },
-  { sec: 'Lyrics' },
+  { sec: 'Lyrics on the notes' },
   { k: 'lyrics', t: 'toggle', l: 'Show lyrics' },
+  { k: 'utauClean', t: 'toggle', l: 'UTAU files: show only the sung syllable (hide VCV and CVVC parts, breaths and symbols)' },
   { k: 'lyricMode', t: 'select', l: 'Placement', opts: [['auto', 'Inside, above when too narrow'], ['inside', 'Inside notes'], ['above', 'Above notes']] },
   { k: 'lyricSize', t: 'range', l: 'Lyric size', min: 50, max: 180, step: 5, u: '%' },
+  { k: 'lyFont', t: 'select', l: 'Font', opts: FONT_OPTS },
+  { k: 'lyWeight', t: 'select', l: 'Weight', opts: [['auto', 'Automatic (bolder while sounding)'], ...WEIGHTS] },
+  { k: 'lyItalic', t: 'toggle', l: 'Italic' },
+  { k: 'lyCase', t: 'select', l: 'Letter case', opts: CASES },
+  { k: 'lySpacing', t: 'range', l: 'Letter spacing', min: -1, max: 8, step: 0.5, u: ' px' },
+  { k: 'lyColor', t: 'select', l: 'Text color', opts: [['auto', 'Automatic contrast'], ['theme', 'Theme text color'], ['custom', 'Custom color']] },
+  { k: 'lyColorC', t: 'color', l: 'Custom text color', when: ['lyColor', 'custom'] },
+  { k: 'lyOut', t: 'range', l: 'Outline', min: 0, max: 6, step: 0.5, u: ' px' },
+  { k: 'lyShadow', t: 'toggle', l: 'Drop shadow' },
   { sec: 'Lyric box' },
   { k: 'lyrPos', t: 'select', l: 'Corner', opts: [['br', 'Bottom right'], ['bl', 'Bottom left'], ['bc', 'Bottom center'], ['tr', 'Top right'], ['tl', 'Top left']] },
   { k: 'lyrSize', t: 'range', l: 'Size', min: 50, max: 220, step: 5, u: '%' },
   { k: 'lyrKaraoke', t: 'toggle', l: 'Highlight each word as it is sung' },
-  { k: 'lyrBox', t: 'toggle', l: 'Dark panel behind the text' },
+  { k: 'lbKStyle', t: 'select', l: 'Karaoke style', opts: [['switch', 'Color changes when sung'], ['sweep', 'Color sweeps across the word'], ['underline', 'Color change with underline'], ['pop', 'Sung word grows briefly']], when: ['lyrKaraoke', true] },
+  { k: 'lbUnsung', t: 'range', l: 'Words not yet sung', min: 20, max: 100, step: 1, u: '%', when: ['lyrKaraoke', true] },
+  { k: 'lyrBox', t: 'toggle', l: 'Panel behind the text' },
   { k: 'lyrNext', t: 'toggle', l: 'Show the next line underneath' },
+  { k: 'lyrRoll', t: 'toggle', l: 'Show per-note edits on the roll too' },
+  { sec: 'Lyric box text' },
+  { k: 'lbFont', t: 'select', l: 'Font', opts: FONT_OPTS },
+  { k: 'lbWeight', t: 'select', l: 'Weight', opts: WEIGHTS },
+  { k: 'lbItalic', t: 'toggle', l: 'Italic' },
+  { k: 'lbCase', t: 'select', l: 'Letter case', opts: CASES },
+  { k: 'lbSpacing', t: 'range', l: 'Letter spacing', min: -1, max: 8, step: 0.5, u: ' px' },
+  { k: 'lbAlign', t: 'select', l: 'Alignment', opts: [['left', 'Left'], ['center', 'Centered'], ['right', 'Right']] },
+  { k: 'lbLine', t: 'range', l: 'Line height', min: 100, max: 200, step: 5, u: '%' },
+  { k: 'lbSec', t: 'range', l: 'Second line size (romaji or typed)', min: 40, max: 100, step: 1, u: '%' },
+  { k: 'lbColor', t: 'select', l: 'Text color', opts: [['theme', 'Theme text color'], ['custom', 'Custom color']] },
+  { k: 'lbColorC', t: 'color', l: 'Custom text color', when: ['lbColor', 'custom'] },
+  { k: 'lbLit', t: 'select', l: 'Sung word color', opts: [['theme', 'Theme highlight'], ['track', 'Color of the lyric track'], ['custom', 'Custom color']] },
+  { k: 'lbLitC', t: 'color', l: 'Custom sung word color', when: ['lbLit', 'custom'] },
+  { k: 'lbOut', t: 'range', l: 'Outline', min: 0, max: 6, step: 0.5, u: ' px' },
+  { k: 'lbShadow', t: 'toggle', l: 'Drop shadow' },
+  { sec: 'Lyric box panel' },
+  { k: 'lbPanel', t: 'select', l: 'Panel color', opts: [['theme', 'Theme background'], ['black', 'Black'], ['white', 'White'], ['custom', 'Custom color']] },
+  { k: 'lbPanelC', t: 'color', l: 'Custom panel color', when: ['lbPanel', 'custom'] },
+  { k: 'lbPanelA', t: 'range', l: 'Panel opacity', min: 0, max: 100, step: 1, u: '%' },
+  { k: 'lbRadius', t: 'range', l: 'Corner rounding', min: 0, max: 40, step: 1, u: ' px' },
+  { k: 'lbPad', t: 'range', l: 'Padding', min: 40, max: 220, step: 5, u: '%' },
+  { sec: 'Preview speed' },
+  { k: 'pvQ', t: 'select', l: 'Preview quality', opts: [['auto', 'Automatic (match the screen, step down if slow)'], ['1', 'Full (same as the video size)'], ['0.75', '75%'], ['0.5', '50%'], ['0.33', '33%']] },
+  { k: 'pvFps', t: 'select', l: 'Preview frame rate', opts: [['max', 'As fast as the screen'], ['30', '30 fps (lighter)']] },
+  { k: 'pvLite', t: 'toggle', l: 'Lighter effects in the preview (no glow)' },
   { sec: 'Portraits' },
   { k: 'portShow', t: 'toggle', l: 'Show portraits' },
   { k: 'portOpacity', t: 'range', l: 'Opacity', min: 5, max: 100, step: 1, u: '%' },
@@ -100,7 +330,7 @@ const FXDEF = [
   { k: 'bgDim', t: 'range', l: 'Dim', min: 0, max: 95, step: 1, u: '%' },
   { k: 'bgBlur', t: 'range', l: 'Blur', min: 0, max: 24, step: 1, u: 'px' },
   { sec: 'Audio visualizer' },
-  { hint: 'Uses the audio you add in Projects. Nothing is drawn without audio. Use up to two at once.' },
+  { hint: 'Uses the audio you add in the Editor tab. Nothing is drawn without audio.' },
   { k: 'wfStyle', t: 'select', l: 'Style (one at a time)', opts: [['off', 'Off'], ['scope', 'Scope line'], ['bars', 'Spectrum bars'], ['keys', 'Piano-key spectrum']] },
   { k: 'wfColor', show: 'any', t: 'select', l: 'Colors', opts: [['theme', 'Theme palette'], ['custom', 'Custom colors']] },
   { k: 'wfColA', show: 'any', t: 'color', l: 'Custom color 1 (lines, low end)' },
@@ -108,6 +338,10 @@ const FXDEF = [
   { k: 'wfOpacity', show: 'any', t: 'range', l: 'Opacity', min: 10, max: 100, step: 1, u: '%' },
   { k: 'wfGain', show: 'any', t: 'range', l: 'Sensitivity', min: 25, max: 300, step: 5, u: '%' },
   { k: 'wfOver', show: 'any', t: 'toggle', l: 'Draw over the notes (otherwise under them)' },
+  { k: 'wfW', show: 'any', t: 'range', l: 'Width', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfH', show: 'scope,bars', t: 'range', l: 'Height', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfPX', show: 'any', t: 'range', l: 'Horizontal position (left to right)', min: 0, max: 100, step: 1, u: '%' },
+  { k: 'wfPY', show: 'scope,bars', t: 'range', l: 'Vertical position (top to bottom)', min: 0, max: 100, step: 1, u: '%' },
   { k: 'wfScopeW', show: 'scope', t: 'range', l: 'Scope line width', min: 1, max: 10, step: 0.5, u: 'px' },
   { k: 'wfScopeY', show: 'scope', t: 'range', l: 'Scope height in the view', min: 10, max: 90, step: 1, u: '%' },
   { k: 'wfBarN', show: 'bars', t: 'range', l: 'Bar count', min: 16, max: 128, step: 8, u: '' },
@@ -133,14 +367,16 @@ const FXDEF = [
   { k: 'keys', t: 'toggle', l: 'Piano keys' },
   { k: 'grid', t: 'toggle', l: 'Grid lines' }
 ];
-const FX0 = { wfStyle: 'off', wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off' };
-const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
+const FX0 = { wfStyle: 'off', wfW: 100, wfH: 100, wfPX: 50, wfPY: 50, wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, lineGap: 0.35, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off', lyFont: 'sans', lyWeight: 'auto', lyItalic: false, lyCase: 'asis', lySpacing: 0, lyColor: 'auto', lyColorC: '#ffffff', lyOut: 0, lyShadow: false, lyrRoll: false, lbFont: 'sans', lbWeight: '650', lbItalic: false, lbCase: 'asis', lbSpacing: 0, lbAlign: 'left', lbLine: 130, lbSec: 62, lbColor: 'theme', lbColorC: '#ffffff', lbLit: 'theme', lbLitC: '#ffd54a', lbOut: 0, lbShadow: false, lbPanel: 'theme', lbPanelC: '#000000', lbPanelA: 80, lbRadius: 14, lbPad: 100, lbKStyle: 'switch', lbUnsung: 62, pvQ: 'auto', pvFps: 'max', pvLite: false, utauClean: true };
+const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'lineGap', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
 const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', lyricText: '', lyricText2: '', lyrTrack: 'auto', bgMode: 'normal', shade: 'dark', tc: {}, themes: {} };
 let fx = { ...FX0 }, look = { ...LOOK0 };
 try { const s = JSON.parse(localStorage.getItem('utaviewer.v2') || 'null'); if (s) { Object.assign(fx, s.fx || {}); Object.assign(look, s.look || {}); if (look.size === '1280x720' && look.fps === '30' && look.mbps === '8') Object.assign(look, { size: LOOK0.size, fps: LOOK0.fps, mbps: LOOK0.mbps }); } } catch (e) {}
 if (look.mine) PRESETS['My theme'] = look.mine; else PRESETS['My theme'] = Object.assign({}, PRESETS.Default, { g: 'Yours', fx: {} });
 if (!look.colors) look.colors = {};
 if (!look.tc || typeof look.tc !== 'object') look.tc = {};
+if (!look.ta || typeof look.ta !== 'object') look.ta = {};
+if (!look.lo || typeof look.lo !== 'object') look.lo = {};   // per-note lyric edits: 'file|track|ms' -> text
 if (!look.themes || typeof look.themes !== 'object') look.themes = {};
 // theme files: colors and effects only, safe to share (no portraits, backgrounds or lyrics)
 const TH_COLORS = ['bg1', 'bg2', 'grid', 'rowW', 'rowB', 'keyW', 'keyB', 'fg', 'play', 'hi', 'act', 'pitch', 'edge'];
@@ -176,9 +412,15 @@ function registerTheme(name, P) {
   PRESETS[n] = P; look.themes[n] = P; return n;
 }
 for (const n in look.themes) { const P = cleanTheme({ dark: look.themes[n], light: look.themes[n].alt, fx: look.themes[n].fx }); if (P) PRESETS[n] = P; else delete look.themes[n]; }
+if (OLD_NAMES[look.preset]) look.preset = OLD_NAMES[look.preset];
 if (!PRESETS[look.preset]) look.preset = 'Default';
 const tkey = (f, t) => f.name + '|' + t.name;
-const save = () => { try { localStorage.setItem('utaviewer.v2', JSON.stringify({ fx, look })); } catch (e) {} };
+// settings are written at most a few times a second while a slider is dragged, and always before the page closes
+let saveT = 0;
+const saveNow = () => { saveT = 0; try { localStorage.setItem('utaviewer.v2', JSON.stringify({ fx, look })); } catch (e) {} };
+const save = () => { if (!saveT) saveT = setTimeout(saveNow, 350); };
+addEventListener('pagehide', () => { if (saveT) { clearTimeout(saveT); saveNow(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && saveT) { clearTimeout(saveT); saveNow(); } });
 
 const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], lines2: [], linesDirty: true, loop: { a: null, b: null, on: false }, queue: [] };
 const cv = $('#cv'), ctx = cv.getContext('2d');
@@ -187,6 +429,16 @@ const cv = $('#cv'), ctx = cv.getContext('2d');
 function msg(text, kind) { S.wake = performance.now(); const m = $('#msg'); m.textContent = text || ''; m.className = 'status' + (kind ? ' ' + kind : ''); }
 
 // file model
+// UST and USTX notes keep both readings of their lyric; this picks the one to show
+function applyUtauMode() {
+  const on = !!fx.utauClean; let any = false;
+  for (const { t } of allTracks()) for (const n of t.notes) {
+    const u = n.u; if (!u) continue; any = true;
+    if (on) { n.lyric = u.k.t; n.rest = u.k.k === 'rest'; n.conn = u.k.k === 'conn'; }
+    else { n.lyric = u.old; n.rest = u.oldRest; n.conn = false; }
+  }
+  if (any) { S.linesDirty = true; if (S.lines) refreshLines(); tlSig = ''; }
+}
 function allTracks() { const r = []; for (const f of S.files) for (const t of f.tracks) r.push({ f, t }); return r; }
 function recalc() {
   let end = 0, any = false;
@@ -211,11 +463,11 @@ const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m *
 function addProject(res, name) {
   const pal = S.P.palette;
   const f = { id: S.nextId++, name, fmt: res.fmt, variant: res.variant || '', tm: res.tm, offset: 0, tracks: res.tracks.map(t => ({ name: t.name, notes: t.notes, on: true, color: pal[S.ci++ % pal.length] })) };
-  for (const t of f.tracks) { const c = look.tc[tkey(f, t)]; if (c) t.color = c; }
-  S.files.push(f);
+  for (const t of f.tracks) { const c = look.tc[tkey(f, t)]; if (c) t.color = c; t.alpha = clamp(+look.ta[tkey(f, t)] || 100, 5, 100); }
+  S.files.push(f); applyUtauMode();
 }
 // extension wins over the browser's guess: Chrome reports .mid as audio/mid
-const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln'];
+const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsq', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln'];
 async function addFiles(list) {
   const files = Array.from(list), audio = [], proj = [];
   for (const f of files) { const e = f.name.split('.').pop().toLowerCase(); (PROJ_EXT.includes(e) ? proj : (['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(e) || f.type.startsWith('audio/') ? audio : proj)).push(f); }
@@ -304,13 +556,12 @@ window.addEventListener('keydown', e => {
   else if (k === 'r' || k === 'R') toggleLoop();
   else if (k === 'Escape') clearLoop();
   else if (k === '?' || k === '/') { $('#help').showModal(); }
-  else if (/^[1-5]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
+  else if (/^[1-4]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
 });
 function nudgeWindow(dir) { fx.window = clamp(Math.round(fx.window * (dir > 0 ? 1.25 : 0.8) * 2) / 2, 2, 24); syncControl('window'); save(); msg('Time window ' + fx.window + ' s'); }
 $('#btnHelp').addEventListener('click', () => $('#help').showModal());
 
 // drawing
-const FONT = '"Instrument Sans","Noto Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
 function updateP() {
   const base = presetOf(look.preset), P = Object.assign({}, base, look.colors || {});
   if (look.palette && look.palette.length) P.palette = look.palette.slice();
@@ -326,11 +577,93 @@ function colorsFor(tr, P) {
   const c = { base: css(rgb), rgb, lift: css(lift), peak: css(mixc(tr.color, P.hi, 0.8)), hi: css(hex2rgb(P.hi)), hiRgb: mixc(tr.color, P.hi, 0.55), edge: css(mixc(tr.color, '#000000', 0.42)), txt: lum(tr.color) > 0.6 ? '#10132a' : '#ffffff', txtLit: ((0.2126 * lift[0] + 0.7152 * lift[1] + 0.0722 * lift[2]) / 255) > 0.6 ? '#10132a' : '#ffffff' };
   tr._k = key; tr._c = c; return c;
 }
+const fontStr = (p, w, size) => (fx[p + 'Italic'] ? 'italic ' : '') + w + ' ' + size + 'px ' + (FONTS[fx[p + 'Font']] || FONT);
+const setSpacing = px => { if ('letterSpacing' in ctx) ctx.letterSpacing = px + 'px'; };
+const fillLum = c => { if (c[0] === '#') return lum(c); const m = c.match(/[\d.]+/g); return m ? (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255 : 1; };
+// text with an optional outline (dark on light letters, light on dark ones) and drop shadow
+function liteOn() { return fx.pvLite && !S.fullRes; }
+function glowPx(sc) { return liteOn() ? 0 : fx.glow * sc; }
+function putText(txt, x, y, fill, out, shadow, sc) {
+  if (shadow && !liteOn()) { ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 5 * sc; ctx.shadowOffsetY = 1.5 * sc; }
+  if (out > 0) { ctx.lineJoin = 'round'; ctx.lineWidth = out * sc * 2; ctx.strokeStyle = fillLum(fill) > 0.55 ? 'rgba(10,10,22,.9)' : 'rgba(255,255,255,.92)'; ctx.strokeText(txt, x, y); }
+  ctx.fillStyle = fill; ctx.fillText(txt, x, y);
+  if (shadow && !liteOn()) { ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; }
+}
 function rr(x, y, w, hh, r) { ctx.beginPath(); if (w < 0.5) w = 0.5; r = Math.min(r, w / 2, hh / 2); if (ctx.roundRect && r > 0) ctx.roundRect(x, y, w, hh, r); else ctx.rect(x, y, w, hh); }
 function curveAt(n, t) {
   const q = n.curve; if (!q) return n.pitch;
   const f = (t - q.a) / q.step, i = clamp(Math.floor(f), 0, q.v.length - 1), j = Math.min(i + 1, q.v.length - 1);
   return q.v[i] + (q.v[j] - q.v[i]) * clamp(f - i, 0, 1);
+}
+// One continuous pitch line per track. Each note brings its own curve (or a flat line); notes that are
+// closer together than `gap` seconds are joined so the line runs through them instead of stopping at each note.
+function trackLine(t, gap) {
+  const c = t._ln; if (c && c.src === t.notes && c.gap === gap) return c;
+  const X = [], Y = [], B = []; let pe = null, runStart = 0;
+  for (const n of t.notes) {
+    if (n.rest) { pe = null; continue; }
+    const q = n.curve, s = q ? q.a : n.t0 - 0.03;
+    const joined = pe !== null && n.t0 - pe <= gap;
+    if (joined) {
+      // drop what the previous note drew past this note's start, keeping the line at that exact moment
+      let lx = null, ly = null;
+      while (X.length > runStart + 1 && X[X.length - 1] >= s) { lx = X.pop(); ly = Y.pop(); B.pop(); }
+      if (lx !== null && X[X.length - 1] < s) { const x0 = X[X.length - 1], y0 = Y[Y.length - 1], f = (s - x0) / ((lx - x0) || 1e-9); X.push(s); Y.push(y0 + (ly - y0) * f); B.push(0); }
+    } else runStart = X.length;
+    const first = X.length;
+    if (q) {
+      for (let k = 0; k < q.v.length; k++) {
+        const tt = Math.min(q.a + k * q.step, n.t1);
+        if (joined && tt < s + 0.02 && tt < n.t0) continue;   // a short ramp from the previous note instead of a jump
+        X.push(tt); Y.push(q.v[k]); B.push(0);
+        if (tt >= n.t1) break;
+      }
+    } else { X.push(n.t0, n.t1); Y.push(n.pitch, n.pitch); B.push(0, 0); }
+    if (!joined) B[first] = 1;
+    pe = n.t1;
+  }
+  const r = { src: t.notes, gap, x: Float64Array.from(X), y: Float32Array.from(Y), b: Uint8Array.from(B) };
+  t._ln = r; return r;
+}
+function lineAt(ln, t) {
+  const X = ln.x, n = X.length; if (!n || t < X[0] || t > X[n - 1]) return null;
+  let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (X[m] <= t) lo = m; else hi = m; }
+  if (ln.b[hi]) return t - X[lo] < X[hi] - t ? ln.y[lo] : null;
+  return ln.y[lo] + (ln.y[hi] - ln.y[lo]) * clamp((t - X[lo]) / ((X[hi] - X[lo]) || 1e-9), 0, 1);
+}
+function drawLine(job, T, tL, tR, playX, pps, yOf, gl, sc) {
+  const { t, sh, rgb } = job, ln = trackLine(t, fx.lineGap), X = ln.x, Y = ln.y, B = ln.b, n = X.length; if (!n) return;
+  const lw = fx.pitchW * sc, ts = T - sh, mode = fx.pitchMode, pa = Math.min(1, 1.1 - fx.dim / 100) * job.ta;
+  const v0 = tL - sh - 0.3, v1 = tR - sh + 0.3, cur = job.cur == null ? ts : job.cur;
+  const lower = x => { let lo = 0, hi = n; while (lo < hi) { const m = (lo + hi) >> 1; if (X[m] < x) lo = m + 1; else hi = m; } return lo; };
+  const px = tt => playX + (tt + sh - T) * pps;
+  const path = (from, to) => {
+    if (to <= from || to < X[0] || from > X[n - 1]) return;
+    ctx.beginPath(); let i = lower(from), on = false;
+    if (i > 0 && i < n && !B[i] && X[i] > from) { const f = (from - X[i - 1]) / ((X[i] - X[i - 1]) || 1e-9); ctx.moveTo(px(from), yOf(Y[i - 1] + (Y[i] - Y[i - 1]) * f)); on = true; }
+    for (; i < n && X[i] <= to; i++) { const x = px(X[i]), y = yOf(Y[i]); if (!on || B[i]) { ctx.moveTo(x, y); on = true; } else ctx.lineTo(x, y); }
+    if (on && i > 0 && i < n && !B[i] && X[i] > to) { const f = (to - X[i - 1]) / ((X[i] - X[i - 1]) || 1e-9); ctx.lineTo(px(to), yOf(Y[i - 1] + (Y[i] - Y[i - 1]) * f)); }
+    ctx.stroke();
+  };
+  // already-sung part is dimmed like the notes, the part from the current note on is full strength
+  const run = (from, to, col) => {
+    from = Math.max(from, v0); to = Math.min(to, v1); if (to <= from) return;
+    ctx.strokeStyle = col; const m = clamp(cur, from, to);
+    if (m > from) { ctx.globalAlpha = pa; path(from, m); }
+    if (to > m) { ctx.globalAlpha = job.ta; path(m, to); }
+  };
+  ctx.lineWidth = lw; ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+  const glow = () => { if (gl > 0) { ctx.shadowColor = css(rgb); ctx.shadowBlur = gl * 0.7; } };
+  if (mode === 'static') run(v0, v1, css(rgb, 1));
+  else {
+    if (mode === 'always') run(v0, v1, css(rgb, 0.35));
+    if (mode === 'trail') {
+      const from = Math.max(v0, ts - fx.trail), to = Math.min(ts, v1);
+      const xa = px(from), xb = px(to);
+      if (to > from && xb - xa > 0.5) { const gg = ctx.createLinearGradient(xa, 0, xb, 0); gg.addColorStop(0, css(rgb, 0)); gg.addColorStop(1, css(rgb, 1)); ctx.globalAlpha = job.ta; ctx.strokeStyle = gg; glow(); path(from, to); ctx.shadowBlur = 0; }
+    } else { glow(); run(v0, ts, css(rgb, 1)); ctx.shadowBlur = 0; }
+  }
+  ctx.globalAlpha = 1; ctx.lineCap = 'round';
 }
 function fitText(text, maxW) {
   if (ctx.measureText(text).width <= maxW) return text;
@@ -408,82 +741,63 @@ function draw(T) {
 
   drawPortraits(W, H, keysW, P);
   drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, false);
-  const act = [], jobs = [], gl = fx.glow * sc, nh = rowH * fx.noteH / 100, rad = nh * fx.round / 100;
+  const act = [], jobs = [], lineJobs = [], gl = glowPx(sc), nh = rowH * fx.noteH / 100, rad = nh * fx.round / 100;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const { f, t } of allTracks()) {
     if (!t.on) continue;
-    const sh = f.offset / 1000, col = colorsFor(t, P), notes = t.notes;
+    const sh = f.offset / 1000, col = colorsFor(t, P), notes = t.notes, ta = (t.alpha == null ? 100 : t.alpha) / 100;
     const gcol = fx.glowColor === 'hi' ? col.hi : fx.glowColor === 'white' ? '#ffffff' : col.base;
+    let curT = null; const lk = S.loN && fx.lyrRoll ? tkey(f, t) + '|' : null;
     const lineRgb = fx.pitchColor === 'track' ? col.rgb : (fx.pitchColor === 'theme' && P.pitchRgb) ? P.pitchRgb : col.hiRgb;
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i], a0 = n.t0 + sh, a1 = n.t1 + sh;
       if (a1 < tL - 0.1 || a0 > tR) continue;
       const x0 = playX + (a0 - T) * pps, x1 = playX + (a1 - T) * pps, w = x1 - x0, y = yOf(n.pitch) - nh / 2;
       const on = T >= a0 && T < a1, past = T >= a1, lit = on && fx.highlight;
-      if (on) act.push({ n, t, col, sh });
-      const alpha = (past ? 1 - fx.dim / 100 : (on ? 1 : 0.95)) * (n.rest ? 0.45 : 1);
+      if (on) { act.push({ n, t, col, sh, ta }); curT = n.t0; }
+      const alpha = (past ? 1 - fx.dim / 100 : (on ? 1 : 0.95)) * (n.rest ? 0.45 : 1) * ta;
       ctx.globalAlpha = alpha; ctx.fillStyle = lit ? col.lift : col.base;
       if (gl > 0) { ctx.shadowColor = gcol; ctx.shadowBlur = gl * (lit ? 2.2 : past ? 0.3 : 0.75); }
       rr(x0, y, w, nh, rad); ctx.fill(); ctx.shadowBlur = 0;
       if (fx.outline > 0) { ctx.strokeStyle = P.edgeRgb ? css(P.edgeRgb) : col.edge; ctx.lineWidth = fx.outline * sc; rr(x0, y, w, nh, rad); ctx.stroke(); }
       if (on && fx.progress) { const u = (T - a0) / (a1 - a0); ctx.fillStyle = col.peak; if (gl > 0 && lit) { ctx.shadowColor = gcol; ctx.shadowBlur = gl; } rr(x0, y, w * u, nh, rad); ctx.fill(); ctx.shadowBlur = 0; }
-      if (fx.flash) { const d = T - a0; if (d >= 0 && d < 0.32) { ctx.globalAlpha = (1 - d / 0.32) * 0.7; ctx.fillStyle = col.hi; rr(x0, y, w, nh, rad); ctx.fill(); } }
-      if (lit) { ctx.globalAlpha = 1; ctx.strokeStyle = P.actC; ctx.lineWidth = Math.max(1.2, 1.7 * sc); rr(x0, y, w, nh, rad); ctx.stroke(); }
-      if (n.lyric) jobs.push({ x0, y, w, on, past, col, lit, text: n.lyric, rest: n.rest });
-      if (fx.pitch) {
-        const lw = fx.pitchW * sc, c = n.curve, ts = T - sh, mode = fx.pitchMode;
-        const path = (from, to) => {
-          ctx.beginPath(); let st = false;
-          if (c) {
-            const i0 = Math.max(0, Math.floor((from - c.a) / c.step)), i1 = Math.min(c.v.length - 1, Math.ceil((to - c.a) / c.step));
-            for (let k = i0; k <= i1; k++) { const tt = Math.min(c.a + k * c.step, to), x = playX + (tt + sh - T) * pps, yy = yOf(c.v[k]); if (st) ctx.lineTo(x, yy); else { ctx.moveTo(x, yy); st = true; } }
-          } else { const yy = yOf(n.pitch); ctx.moveTo(playX + (Math.max(from, n.t0) + sh - T) * pps, yy); ctx.lineTo(playX + (to + sh - T) * pps, yy); }
-          ctx.stroke();
-        };
-        const start = c ? c.a : n.t0; ctx.lineWidth = lw; ctx.globalAlpha = past ? Math.min(1, 1.1 - fx.dim / 100) : 1;
-        if (mode === 'static') { ctx.strokeStyle = css(lineRgb, 1); path(start, n.t1); }
-        else {
-          if (mode === 'always') { ctx.strokeStyle = css(lineRgb, 0.35); path(start, n.t1); }
-          if (ts >= start) {
-            const to = Math.min(ts, n.t1);
-            if (mode === 'trail') {
-              if (ts - fx.trail < n.t1) {
-                const from = Math.max(start, ts - fx.trail), xa = playX + (from + sh - T) * pps, xb = playX + (to + sh - T) * pps;
-                if (xb - xa > 0.5) { const gg = ctx.createLinearGradient(xa, 0, xb, 0); gg.addColorStop(0, css(lineRgb, 0)); gg.addColorStop(1, css(lineRgb, 1)); ctx.strokeStyle = gg; if (gl > 0) { ctx.shadowColor = css(lineRgb); ctx.shadowBlur = gl * 0.7; } path(from, to); ctx.shadowBlur = 0; }
-              }
-            } else { ctx.strokeStyle = css(lineRgb, 1); if (gl > 0) { ctx.shadowColor = css(lineRgb); ctx.shadowBlur = gl * 0.7; } path(start, to); ctx.shadowBlur = 0; }
-          }
-        }
-      }
+      if (fx.flash) { const d = T - a0; if (d >= 0 && d < 0.32) { ctx.globalAlpha = (1 - d / 0.32) * 0.7 * ta; ctx.fillStyle = col.hi; rr(x0, y, w, nh, rad); ctx.fill(); } }
+      if (lit) { ctx.globalAlpha = ta; ctx.strokeStyle = P.actC; ctx.lineWidth = Math.max(1.2, 1.7 * sc); rr(x0, y, w, nh, rad); ctx.stroke(); }
+      let ltxt = n.lyric; if (ltxt && lk) { const o = look.lo[lk + Math.round(n.t0 * 1000)]; if (o !== undefined) ltxt = o; }
+      if (ltxt) jobs.push({ x0, y, w, on, past, col, lit, text: ltxt, rest: n.rest, ta });
     }
+    if (fx.pitch) lineJobs.push({ t, sh, rgb: lineRgb, cur: curT, ta });
   }
   ctx.globalAlpha = 1;
+  for (const L of lineJobs) drawLine(L, T, tL, tR, playX, pps, yOf, gl, sc);
+  ctx.lineCap = 'round';
 
-  for (const a of act) a.y = yOf(curveAt(a.n, T - a.sh));
+  for (const a of act) { const lv = lineAt(trackLine(a.t, fx.lineGap), T - a.sh); a.y = yOf(lv == null ? curveAt(a.n, T - a.sh) : lv); }
   if (fx.head) for (const a of act) {
     const hc = P.pitchRgb ? css(P.pitchRgb) : a.col.hi;
-    ctx.fillStyle = hc; if (gl > 0) { ctx.shadowColor = hc; ctx.shadowBlur = gl * 1.4; }
-    ctx.beginPath(); ctx.arc(playX, a.y, Math.max(3, (fx.pitchW + 2.5) * sc), 0, 6.2832); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.globalAlpha = a.ta; ctx.fillStyle = hc; if (gl > 0) { ctx.shadowColor = hc; ctx.shadowBlur = gl * 1.4; }
+    ctx.beginPath(); ctx.arc(playX, a.y, Math.max(3, (fx.pitchW + 2.5) * sc), 0, 6.2832); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
   }
 
   if (fx.lyrics && jobs.length) {
     const fs = Math.max(8, Math.min(nh * 0.62, 24 * sc) * fx.lyricSize / 100), fsA = Math.max(8, Math.min(18 * sc, fs * 0.9));
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; setSpacing(fx.lySpacing * sc);
+    const custom = fx.lyColor === 'custom' ? fx.lyColorC : fx.lyColor === 'theme' ? P.fg : null;
     for (const j of jobs) {
       if (j.x0 + j.w < -20 || j.x0 > W) continue;
-      const wgt = j.on ? 700 : 600; let done = false;
+      const wgt = fx.lyWeight === 'auto' ? (j.on ? 700 : 600) : fx.lyWeight, word = caseOf(j.text, fx.lyCase); let done = false;
       if (fx.lyricMode !== 'above') {
-        ctx.font = `${wgt} ${fs}px ${FONT}`;
-        const avail = j.w - 8 * sc, txt = fx.lyricMode === 'inside' ? fitText(j.text, avail) : (ctx.measureText(j.text).width <= avail ? j.text : '');
-        if (txt) { ctx.globalAlpha = (j.past ? 0.75 : 1) * (j.rest ? 0.5 : 1); ctx.fillStyle = j.lit ? j.col.txtLit : j.col.txt; ctx.fillText(txt, j.x0 + 5 * sc, j.y + nh / 2 + sc * 0.5); done = true; }
+        ctx.font = fontStr('ly', wgt, fs);
+        const avail = j.w - 8 * sc, txt = fx.lyricMode === 'inside' ? fitText(word, avail) : (ctx.measureText(word).width <= avail ? word : '');
+        if (txt) { ctx.globalAlpha = (j.past ? 0.75 : 1) * (j.rest ? 0.5 : 1) * j.ta; putText(txt, j.x0 + 5 * sc, j.y + nh / 2 + sc * 0.5, custom || (j.lit ? j.col.txtLit : j.col.txt), fx.lyOut, fx.lyShadow, sc); done = true; }
       }
       if (!done && fx.lyricMode !== 'inside') {
-        ctx.font = `${wgt} ${fsA}px ${FONT}`;
-        const txt = fitText(j.text, Math.max(j.w, 80 * sc));
-        if (txt) { ctx.globalAlpha = (j.past ? 0.55 : 1) * (j.rest ? 0.5 : 1); ctx.fillStyle = P.fg; if (j.on && gl > 0) { ctx.shadowColor = j.col.base; ctx.shadowBlur = gl * 0.6; } ctx.fillText(txt, j.x0 + 2 * sc, j.y - fsA * 0.7); ctx.shadowBlur = 0; }
+        ctx.font = fontStr('ly', wgt, fsA);
+        const txt = fitText(word, Math.max(j.w, 80 * sc));
+        if (txt) { ctx.globalAlpha = (j.past ? 0.55 : 1) * (j.rest ? 0.5 : 1) * j.ta; if (j.on && gl > 0) { ctx.shadowColor = j.col.base; ctx.shadowBlur = gl * 0.6; } putText(txt, j.x0 + 2 * sc, j.y - fsA * 0.7, custom || P.fg, fx.lyOut, fx.lyShadow, sc); ctx.shadowBlur = 0; }
       }
     }
-    ctx.globalAlpha = 1;
+    setSpacing(0); ctx.globalAlpha = 1;
   }
 
   drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, true);
@@ -601,7 +915,7 @@ function updateTL() {
   if (tlSig === '' || now - sigAt > 250) {
     sigAt = now;
     const lanes = tlLanes();
-    const sig = lanes.map(l => l.name + l.color + l.on + (l.f ? l.f.offset : '')).join('|') + '|' + S.duration.toFixed(2) + '|' + tlZoom.value + '|' + tlScroll.clientWidth + '|' + (S.buf ? 1 : 0) + '|' + (document.documentElement.dataset.theme || '') + '|' + window.innerWidth;
+    const sig = lanes.map(l => l.name + l.color + l.on + (l.f ? l.f.offset : '')).join('|') + '|' + Math.round(S.shift * 1000) + '|' + S.duration.toFixed(2) + '|' + tlZoom.value + '|' + tlScroll.clientWidth + '|' + (S.buf ? 1 : 0) + '|' + (document.documentElement.dataset.theme || '') + '|' + window.innerWidth;
     if (sig !== tlSig) { tlSig = sig; drawTL(); }
   }
   if (S.loop.a != null) syncLoopUI();
@@ -614,7 +928,41 @@ tlBody.addEventListener('pointerdown', e => { tlDrag = true; S.scrub = true; tlB
 tlBody.addEventListener('pointermove', e => { if (tlDrag) tlSeekFrom(e); });
 const tlEnd = () => { tlDrag = false; S.scrub = false; };
 tlBody.addEventListener('pointerup', tlEnd); tlBody.addEventListener('pointercancel', tlEnd);
-tlZoom.addEventListener('input', () => { const t = S.time; tlSig = ''; updateTL(); tlScroll.scrollLeft = Math.max(0, t * tlPps - tlScroll.clientWidth / 3); });
+// drag the audio lane to move the audio; snaps to beats and note starts, hold Alt (or Ctrl) to move freely
+let adrag = null;
+function audioHit(e) {
+  if (!S.buf || e.shiftKey) return false;
+  const r = tlBody.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, i = tlLanes().length - 1, y0 = RULER + i * LANE;
+  const x0 = -S.shift * tlPps; return y >= y0 && y < y0 + LANE && x >= x0 && x <= x0 + S.buf.duration * tlPps;
+}
+function snapAudioStart(ts) {
+  const tm = S.tm, thr = 10 / tlPps; let best = ts, bd = thr;
+  const tryT = t => { const d = Math.abs(t - ts); if (d < bd) { bd = d; best = t; } };
+  tryT(0);
+  if (tm) {
+    const beatS = (tm.t2s(tm.res) - tm.t2s(0)), fine = beatS * tlPps >= 60 ? 2 : 1, tk = tm.s2t(Math.max(0, ts)), q = tm.res / fine;
+    for (const k of [Math.floor(tk / q), Math.ceil(tk / q)]) tryT(tm.t2s(k * q));
+  }
+  for (const { f, t } of allTracks()) { if (!t.on) continue; const sh = f.offset / 1000; for (const n of t.notes) { const s = n.t0 + sh; if (s > ts + thr) break; tryT(s); } }
+  return best;
+}
+tlBody.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || !audioHit(e)) return;
+  adrag = { x: e.clientX, s0: -S.shift }; tlBody.style.cursor = 'grabbing'; tlBody.setPointerCapture(e.pointerId); e.stopImmediatePropagation(); e.preventDefault();
+}, true);
+tlBody.addEventListener('pointermove', e => {
+  if (!adrag) { tlBody.style.cursor = audioHit(e) ? 'grab' : ''; return; }
+  let ts = adrag.s0 + (e.clientX - adrag.x) / tlPps;
+  if (!(e.altKey || e.ctrlKey)) ts = snapAudioStart(ts);
+  S.shift = -ts; const ash = $('#ash'); if (ash) ash.value = Math.round(S.shift * 1000); recalc(); tlSig = ''; drawTL(); e.stopImmediatePropagation();
+}, true);
+const adEnd = () => { if (!adrag) return; adrag = null; tlBody.style.cursor = ''; if (S.playing) restartAudio(); msg('Audio starts at ' + (-S.shift).toFixed(3).replace(/\.?0+$/, '') + ' s'); };
+tlBody.addEventListener('pointerup', adEnd, true); tlBody.addEventListener('pointercancel', adEnd, true);
+let zoomRaf = 0;
+tlZoom.addEventListener('input', () => {
+  if (zoomRaf) return;
+  zoomRaf = requestAnimationFrame(() => { zoomRaf = 0; const t = S.time; tlSig = ''; updateTL(); tlScroll.scrollLeft = Math.max(0, t * tlPps - tlScroll.clientWidth / 3); });
+});
 
 // main loop
 let lastTxt = '', lastInfo = '';
@@ -625,10 +973,27 @@ function bpmText() {
 }
 // redraw at full speed only while something is happening, otherwise ~5 fps
 for (const ev of ['pointerdown', 'pointermove', 'keydown', 'input', 'change', 'wheel', 'drop', 'dragover', 'resize']) window.addEventListener(ev, () => { S.wake = performance.now(); }, { passive: true });
+// build the pitch lines while nothing is happening, so the first play does not hitch
+function warmLines() {
+  if (S.playing || S.exporting) return;
+  for (const { t } of allTracks()) { const c = t._ln; if (!(c && c.src === t.notes && c.gap === fx.lineGap)) { trackLine(t, fx.lineGap); return; } }
+}
+function adaptQuality(dt) {
+  // while playing on automatic, step the preview down when frames are arriving late, and back up only cautiously
+  if (!S.playing || S.exporting || fx.pvQ !== 'auto' || document.hidden || dt <= 0 || dt >= 0.25) { S.ivN = 0; return; }
+  S.iv = S.ivN ? S.iv * 0.92 + dt * 0.08 : dt; S.ivN = (S.ivN || 0) + 1;
+  const want = fx.pvFps === '30' ? 1 / 30 : 1 / 58, now = performance.now();
+  if (S.ivN < 40 || now - (S.adT || 0) < 2500) return;
+  if (S.iv > want * 1.35 && S.adapt > 0.5) { S.adapt = Math.max(0.5, +(S.adapt - 0.15).toFixed(2)); S.adT = now; S.qDirty = true; S.ivN = 0; if (S.upTried) S.noUp = true; }
+  else if (S.iv < want * 1.08 && S.adapt < 1 && !S.noUp && now - (S.adT || 0) > 9000) { S.adapt = Math.min(1, +(S.adapt + 0.15).toFixed(2)); S.adT = now; S.qDirty = true; S.ivN = 0; S.upTried = true; }
+}
 function loop(ts) {
   const busy = S.playing || S.exporting || S.parts.length || ts - (S.wake || 0) < 1500;
-  if (!busy && ts - (S.last || 0) < 200) { requestAnimationFrame(loop); return; }
+  if (!busy && ts - (S.last || 0) < 200) { warmLines(); setTimeout(() => requestAnimationFrame(loop), 50); return; }
+  if (!S.exporting && S.playing && fx.pvFps === '30' && ts - (S.last || 0) < 29) { requestAnimationFrame(loop); return; }
   const dt = clamp((ts - (S.last || ts)) / 1000, 0, 0.1); S.last = ts;
+  if (S.playing) adaptQuality((ts - (S.rafT || ts)) / 1000); S.rafT = ts;
+  if (S.qDirty) applyRes();
   if (S.playing && S.ctx) {
     S.time = S.t0 + (S.ctx.currentTime - S.c0);
     if (S.loop.on && !S.exporting && S.time >= S.loop.b) seek(S.loop.a);
@@ -641,6 +1006,7 @@ function loop(ts) {
   }
   stepParticles(dt); S.dt = dt;
   draw(S.time);
+  if (ts - (S.loT || 0) > 250) { S.loT = ts; markLoRow(); }
   const tx = fmt(S.time); if (tx !== lastTxt) { $('#tNow').textContent = tx; lastTxt = tx; }
   updateTL(); { const ti = S.files.map(f => f.name).join(', ') + bpmText(); if (ti !== lastInfo) { lastInfo = ti; $('#tcInfo').textContent = ti; } }
   if (S.exporting) { const x = S.exporting, k = clamp((S.time - x.from) / Math.max(0.1, x.to - x.from), 0, 1); $('#recBar').style.width = (k * 100).toFixed(1) + '%'; $('#recText').textContent = 'Recording ' + Math.round(k * 100) + '%  (' + fmt(S.time - x.from) + ' of ' + fmt(x.to - x.from) + ')'; }
@@ -660,7 +1026,10 @@ function renderProjects() {
         h('input', { type: 'checkbox', checked: t.on, 'aria-label': 'Show ' + t.name, onchange: e => { t.on = e.target.checked; recalc(); } }),
         h('input', { type: 'color', value: t.color, title: 'Note color for this track', 'aria-label': 'Color for ' + t.name, oninput: e => { t.color = e.target.value; look.tc[tkey(f, t)] = t.color; save(); }, onchange: () => renderProjects() }),
         h('span', { class: 'tn', title: t.name }, t.name), h('span', { class: 'nc' }, t.notes.length + ' notes'),
-        look.tc[tkey(f, t)] ? h('button', { class: 'btn small', type: 'button', title: 'Back to the theme color', 'aria-label': 'Reset color for ' + t.name, onclick: () => { delete look.tc[tkey(f, t)]; recolorTracks(); save(); } }, 'Reset') : null));
+        look.tc[tkey(f, t)] ? h('button', { class: 'btn small', type: 'button', title: 'Back to the theme color', 'aria-label': 'Reset color for ' + t.name, onclick: () => { delete look.tc[tkey(f, t)]; recolorTracks(); save(); } }, 'Reset') : null,
+        h('label', { class: 'top' }, h('span', null, 'Opacity'),
+          h('input', { type: 'range', min: 5, max: 100, step: 5, value: t.alpha, 'aria-label': 'Opacity for ' + t.name, oninput: e => { t.alpha = +e.target.value; if (t.alpha >= 100) delete look.ta[tkey(f, t)]; else look.ta[tkey(f, t)] = t.alpha; e.target.nextSibling.textContent = t.alpha + '%'; save(); } }),
+          h('span', { class: 'ov' }, t.alpha + '%'))));
     }
     el.append(h('div', { class: 'foff' }, h('label', { for: 'off' + f.id }, 'Time offset'),
       h('input', { id: 'off' + f.id, type: 'number', step: 10, value: f.offset, oninput: e => { f.offset = parseFloat(e.target.value) || 0; recalc(); } }), 'ms'));
@@ -677,10 +1046,40 @@ function renderAudio() {
 }
 
 // effects + look UI
-const ctrlRefs = {};
-function syncControl(k) { const r = ctrlRefs[k]; if (!r) return; if (r.type === 'checkbox') r.checked = !!fx[k]; else { r.value = fx[k]; if (r.nextOutput) r.nextOutput.textContent = fx[k] + (r.u || ''); } }
-const wfRows = [];
-function syncWf() { for (const e of wfRows) e.hidden = fx.wfStyle === 'off' || (e.dataset.show !== 'any' && e.dataset.show !== fx.wfStyle); }
+const ctrlRefs = {}, whenRows = [], wfRows = [];
+// a control can appear in more than one place (Effects and the Editor tab), so every key keeps a list of its inputs
+function syncControl(k) {
+  for (const r of ctrlRefs[k] || []) { if (r.type === 'checkbox') r.checked = !!fx[k]; else { r.value = fx[k]; if (r.nextOutput) r.nextOutput.textContent = fx[k] + (r.u || ''); } }
+}
+function syncWhen() { for (const w of whenRows) w.el.hidden = fx[w.k] !== w.v; }
+function syncWf() { for (const e of wfRows) e.hidden = fx.wfStyle === 'off' || (e.dataset.show !== 'any' && !e.dataset.show.split(',').includes(fx.wfStyle)); }
+const FXMAP = {}; for (const d of FXDEF) if (d.k) FXMAP[d.k] = d;
+function makeCtl(d, pre) {
+  const id = pre + d.k, put = (v) => { fx[d.k] = v; if (d.k === 'utauClean') { applyUtauMode(); } if (d.k.startsWith('pv')) { S.qDirty = true; S.adapt = 1; S.noUp = false; S.upTried = false; } syncControl(d.k); if (d.k === 'wfStyle') syncWf(); syncWhen(); save(); };
+  const reg = inp => { (ctrlRefs[d.k] = ctrlRefs[d.k] || []).push(inp); return inp; };
+  let el;
+  if (d.t === 'color') {
+    const inp = reg(h('input', { type: 'color', id, value: fx[d.k], oninput: e => put(e.target.value) }));
+    el = h('label', { class: 'cell', for: id, style: 'margin:0' }, h('span', null, d.l), inp);
+  } else if (d.t === 'toggle') {
+    const inp = reg(h('input', { type: 'checkbox', id, checked: !!fx[d.k], onchange: e => put(e.target.checked) }));
+    el = h('label', { class: 'chk', for: id }, inp, h('span', null, d.l));
+  } else if (d.t === 'range') {
+    const out = h('output', { for: id }, fx[d.k] + d.u);
+    const inp = reg(h('input', { type: 'range', id, min: d.min, max: d.max, step: d.step, value: fx[d.k], oninput: e => { put(parseFloat(e.target.value)); if (d.k === 'pad') recalc(); } }));
+    if (d.reload) inp.addEventListener('change', () => { if (S.files.some(f => f.fmt === 'MIDI')) msg('Bend range applies to MIDI files added from now on.'); });
+    inp.nextOutput = out; inp.u = d.u;
+    el = h('div', { class: 'row r' }, h('label', { for: id }, d.l), out, inp);
+  } else {
+    const sel = reg(h('select', { id, onchange: e => put(e.target.value) }, d.opts.map(o => h('option', { value: o[0] }, o[1]))));
+    sel.value = fx[d.k]; el = h('div', { class: 'row' }, h('label', { for: id }, d.l), sel);
+    el.style.gridTemplateColumns = 'minmax(0,1fr)';
+  }
+  const tip = d.tip || TIPS[d.k]; if (tip) el.dataset.tip = tip;
+  if (d.show) { el.dataset.show = d.show; wfRows.push(el); }
+  if (d.when) whenRows.push({ el, k: d.when[0], v: d.when[1] });
+  return el;
+}
 function buildFx() {
   const pane = $('#fxPane'); let box = pane, first = true;
   for (const d of FXDEF) {
@@ -690,29 +1089,10 @@ function buildFx() {
       pane.append(det); box = body; continue;
     }
     if (d.hint) { box.append(h('p', { class: 'hint' }, d.hint)); continue; }
-    const id = 'fx-' + d.k; let el;
-    if (d.t === 'color') {
-      const inp = h('input', { type: 'color', id, value: fx[d.k], oninput: e => { fx[d.k] = e.target.value; save(); } });
-      ctrlRefs[d.k] = inp; el = h('label', { class: 'cell', for: id, style: 'margin:0' }, h('span', null, d.l), inp);
-    } else if (d.t === 'toggle') {
-      const inp = h('input', { type: 'checkbox', id, checked: !!fx[d.k], onchange: e => { fx[d.k] = e.target.checked; save(); } });
-      ctrlRefs[d.k] = inp; el = h('label', { class: 'chk', for: id }, inp, h('span', null, d.l));
-    } else if (d.t === 'range') {
-      const out = h('output', { for: id }, fx[d.k] + d.u);
-      const inp = h('input', { type: 'range', id, min: d.min, max: d.max, step: d.step, value: fx[d.k], oninput: e => { fx[d.k] = parseFloat(e.target.value); out.textContent = fx[d.k] + d.u; save(); if (d.k === 'pad') recalc(); } });
-      if (d.reload) inp.addEventListener('change', () => { if (S.files.some(f => f.fmt === 'MIDI')) msg('Bend range applies to MIDI files added from now on.'); });
-      inp.nextOutput = out; inp.u = d.u; ctrlRefs[d.k] = inp;
-      el = h('div', { class: 'row r' }, h('label', { for: id }, d.l), out, inp);
-    } else {
-      const sel = h('select', { id, onchange: e => { fx[d.k] = e.target.value; if (d.k === 'wfStyle') syncWf(); save(); } }, d.opts.map(o => h('option', { value: o[0] }, o[1])));
-      sel.value = fx[d.k]; ctrlRefs[d.k] = sel; el = h('div', { class: 'row' }, h('label', { for: id }, d.l), sel);
-      el.style.gridTemplateColumns = 'minmax(0,1fr)';
-    }
-    if (d.show) { el.dataset.show = d.show; wfRows.push(el); }
-    box.append(el);
+    box.append(makeCtl(d, 'fx-'));
   }
-  syncWf();
-  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); syncVisInputs(); syncWf(); save(); recalc(); } }, 'Reset effects'));
+  syncWf(); syncWhen();
+  pane.append(h('button', { class: 'btn small', type: 'button', onclick: () => { fx = { ...FX0 }; for (const k in ctrlRefs) syncControl(k); syncVisInputs(); syncWf(); syncWhen(); save(); recalc(); } }, 'Reset effects'));
 }
 const COLORDEF = [['bg1', 'Background top'], ['bg2', 'Background bottom'], ['rowW', 'Row, white key'], ['rowB', 'Row, black key'], ['grid', 'Grid lines'], ['keyW', 'Key, white'], ['keyB', 'Key, black'], ['play', 'Playhead'], ['pitch', 'Pitch curve'], ['act', 'Active outline'], ['edge', 'Note outline'], ['fg', 'Text']];
 const colorRefs = {}, palRefs = [];
@@ -743,22 +1123,33 @@ function applyPreset(name, auto) {
 }
 function buildPresets() {
   const box = $('#presetGroups'); box.replaceChildren();
-  const groups = [['Yours', 'Yours'], ['Editors', 'Editor styles'], ['Characters', 'Characters'], ['Moods', 'Monochrome']];
+  let open = {}; try { open = JSON.parse(localStorage.getItem('utaviewer.pg') || '{}') || {}; } catch (e) {}
+  const groups = [['Yours', 'Yours'], ['Editors', 'Editor styles'], ['Characters', 'Characters'], ['Colors', 'Color themes']];
+  const btn = name => {
+    const P = presetOf(name);
+    return h('button', { class: 'preset', type: 'button', 'aria-pressed': String(look.preset === name), onclick: () => applyPreset(name) },
+      h('div', { class: 'sw' }, h('i', { style: 'background:' + P.bg1 }), P.palette.slice(0, 4).map(c => h('i', { style: 'background:' + c }))), h('span', null, PRESETS[name].label || name));
+  };
   for (const [g, title] of groups) {
     const names = Object.keys(PRESETS).filter(n => PRESETS[n].g === g); if (!names.length) continue;
-    box.append(h('div', { class: 'sec' }, title));
-    const wrap = h('div', { class: 'presets' });
-    for (const name of names) {
-      const P = presetOf(name);
-      wrap.append(h('button', { class: 'preset', type: 'button', 'aria-pressed': String(look.preset === name), onclick: () => applyPreset(name) },
-        h('div', { class: 'sw' }, h('i', { style: 'background:' + P.bg1 }), P.palette.slice(0, 4).map(c => h('i', { style: 'background:' + c }))), h('span', null, name)));
-    }
-    box.append(wrap);
+    const here = names.includes(look.preset), isOpen = g in open ? !!open[g] : (here || g === 'Yours');
+    const d = h('details', { class: 'pg' },
+      h('summary', null, h('span', { class: 'pgt' }, title), h('span', { class: 'pgn' }, here && !isOpen ? PRESETS[look.preset].label ? PRESETS[look.preset].shade + ' ' + PRESETS[look.preset].label : look.preset : String(names.length))));
+    if (isOpen) d.open = true;
+    d.addEventListener('toggle', () => { open[g] = d.open; try { localStorage.setItem('utaviewer.pg', JSON.stringify(open)); } catch (e) {} const n = d.querySelector('.pgn'); if (n) n.textContent = here && !d.open ? (PRESETS[look.preset].label ? PRESETS[look.preset].shade + ' ' + PRESETS[look.preset].label : look.preset) : String(names.length); });
+    if (g === 'Colors') {
+      for (const sh of ['Black', 'White']) {
+        d.append(h('div', { class: 'sub' }, sh + ' and a color'));
+        d.append(h('div', { class: 'presets' }, names.filter(n => PRESETS[n].shade === sh).map(btn)));
+      }
+    } else d.append(h('div', { class: 'presets' }, names.map(btn)));
+    box.append(d);
   }
+  fillQuickThemes();
 }
 function syncShade() {
   const has = !!(PRESETS[look.preset] && PRESETS[look.preset].alt);
-  document.querySelectorAll('#shade button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === look.shade)); b.disabled = !has; });
+  document.querySelectorAll('#shade button, .qshade').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === look.shade)); b.disabled = !has; });
   $('#themeRemove').hidden = !look.themes[look.preset];
   $('#shadeHint').textContent = has ? 'Only changes the piano roll and exported video. The app theme (top right) stays separate.' : 'Light and dark versions are available for the character themes.';
 }
@@ -772,7 +1163,23 @@ $('#saveMine').addEventListener('click', () => {
   PRESETS['My theme'] = Object.assign(P, { g: 'Yours', fx: o }); look.mine = PRESETS['My theme'];
   look.preset = 'My theme'; look.colors = {}; look.palette = null; updateP(); save(); buildPresets(); msg('Saved as My theme.', 'ok');
 });
-function setSize() { const [w, hh] = look.size.split('x').map(Number); cv.width = w; cv.height = hh; }
+// The preview is drawn at the size it is shown (or a chosen scale), never bigger than the video size.
+// Recording always switches to the full video size first.
+S.adapt = 1;
+function previewScale() {
+  if (S.fullRes) return 1;
+  if (fx.pvQ !== 'auto') return parseFloat(fx.pvQ) || 1;
+  const r = cv.getBoundingClientRect(), w = look.size.split('x').map(Number)[0];
+  const fit = r.width > 20 ? Math.min(1, r.width * (window.devicePixelRatio || 1) / w) : 1;
+  return Math.max(0.25, Math.round(fit * S.adapt * 20) / 20);
+}
+function applyRes() {
+  S.qDirty = false; const [w, hh] = look.size.split('x').map(Number), q = previewScale();
+  const nw = Math.max(16, Math.round(w * q / 2) * 2), nh = Math.max(16, Math.round(hh * q / 2) * 2);
+  if (cv.width !== nw || cv.height !== nh) { cv.width = nw; cv.height = nh; S.curQ = q; }
+}
+function setSize() { S.adapt = 1; applyRes(); }
+if (window.ResizeObserver) new ResizeObserver(() => { S.qDirty = true; S.wake = performance.now(); }).observe(cv);
 $('#size').value = look.size; $('#size').addEventListener('change', e => { look.size = e.target.value; setSize(); save(); });
 $('#caption').value = look.caption; $('#caption').addEventListener('input', e => { look.caption = e.target.value; save(); });
 $('#fps').value = look.fps; $('#fps').addEventListener('change', e => { look.fps = e.target.value; save(); });
@@ -780,9 +1187,62 @@ $('#mbps').value = look.mbps; $('#mbps').addEventListener('change', e => { look.
 
 // tabs
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
-  document.querySelectorAll('.pane').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
+  const rail = b.closest('.rail');
+  rail.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  rail.querySelectorAll('.pane').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
 }));
+
+// resizable sidebars
+(function () {
+  const win = document.querySelector('.win'), KEY = 'utaviewer.rails', DEF = { l: 330, r: 330 }, MIN = 240;
+  let w = Object.assign({}, DEF);
+  try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s) { w.l = +s.l || DEF.l; w.r = +s.r || DEF.r; } } catch (e) {}
+  const maxFor = other => Math.max(MIN, Math.min(640, innerWidth - other - 6 * 2 - 320));
+  function apply() {
+    w.l = clamp(w.l, MIN, maxFor(w.r)); w.r = clamp(w.r, MIN, maxFor(w.l));
+    win.style.setProperty('--wl', w.l + 'px'); win.style.setProperty('--wr', w.r + 'px');
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(w)); } catch (e) {} }
+  function wire(id, side) {
+    const h = document.getElementById(id);
+    h.addEventListener('pointerdown', e => {
+      e.preventDefault(); h.setPointerCapture(e.pointerId); h.classList.add('drag'); document.body.classList.add('rzing');
+      const x0 = e.clientX, w0 = w[side];
+      const mv = ev => { w[side] = w0 + (side === 'l' ? ev.clientX - x0 : x0 - ev.clientX); apply(); };
+      const up = () => { h.classList.remove('drag'); document.body.classList.remove('rzing'); h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); persist(); };
+      h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+    });
+    h.addEventListener('dblclick', () => { w[side] = DEF[side]; apply(); persist(); });
+    h.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault(); e.stopPropagation();
+      const d = (e.key === 'ArrowRight' ? 1 : -1) * (side === 'l' ? 1 : -1) * (e.shiftKey ? 60 : 20);
+      w[side] += d; apply(); persist();
+    });
+  }
+  wire('rzL', 'l'); wire('rzR', 'r'); apply();
+  // timeline height
+  const tl = document.querySelector('.tl'), hT = document.getElementById('rzT'), TKEY = 'utaviewer.tlh';
+  let th = 0; try { th = +localStorage.getItem(TKEY) || 0; } catch (e) {}
+  const tlMax = () => Math.max(80, innerHeight - 47 - 24 - 6 - 43 - 150 - 140);
+  function applyT() { if (!th) { tl.classList.remove('sized'); return; } th = clamp(th, 50, tlMax()); tl.classList.add('sized'); tl.style.setProperty('--ht', th + 'px'); }
+  const curT = () => document.getElementById('tlScroll').getBoundingClientRect().height;
+  hT.addEventListener('pointerdown', e => {
+    e.preventDefault(); hT.setPointerCapture(e.pointerId); hT.classList.add('drag'); document.body.classList.add('rzing'); document.body.style.cursor = 'row-resize';
+    const y0 = e.clientY, h0 = th || curT();
+    const mv = ev => { th = h0 + (y0 - ev.clientY); applyT(); };
+    const up = () => { hT.classList.remove('drag'); document.body.classList.remove('rzing'); document.body.style.cursor = ''; hT.removeEventListener('pointermove', mv); hT.removeEventListener('pointerup', up); hT.removeEventListener('pointercancel', up); try { localStorage.setItem(TKEY, String(Math.round(th))); } catch (e2) {} };
+    hT.addEventListener('pointermove', mv); hT.addEventListener('pointerup', up); hT.addEventListener('pointercancel', up);
+  });
+  hT.addEventListener('dblclick', () => { th = 0; applyT(); try { localStorage.removeItem(TKEY); } catch (e) {} });
+  hT.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault(); e.stopPropagation(); th = (th || curT()) + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 60 : 20); applyT();
+    try { localStorage.setItem(TKEY, String(Math.round(th))); } catch (e2) {}
+  });
+  applyT(); addEventListener('resize', applyT);
+  addEventListener('resize', apply);
+})();
 
 // file inputs and drag/drop
 $('#btnProj').addEventListener('click', () => $('#fileProj').click());
@@ -808,14 +1268,15 @@ async function startExport(opts) {
   const toRaw = parseFloat($('#expTo').value), to = whole || !isFinite(toRaw) ? S.duration : clamp(toRaw, 0, S.duration);
   if (to - from < 0.5) { msg('The end of the range has to be at least half a second after the start.', 'err'); return null; }
   pause(); await ensureCtx(); S.parts.length = 0;
+  S.fullRes = true; applyRes();
   const stream = cv.captureStream(parseInt(look.fps, 10));
   S.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: parseFloat(look.mbps) * 1e6, audioBitsPerSecond: 192000 }); } catch (e) { msg('Recording could not start: ' + e.message, 'err'); return null; }
+  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: parseFloat(look.mbps) * 1e6, audioBitsPerSecond: 192000 }); } catch (e) { msg('Recording could not start: ' + e.message, 'err'); S.fullRes = false; S.qDirty = true; return null; }
   const chunks = [], type = mime.split(';')[0];
   let done; const finished = new Promise(r => { done = r; });
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec.onstop = () => {
-    const ex = S.exporting; S.exporting = null; $('#recState').hidden = true; $('#rec').disabled = false;
+    const ex = S.exporting; S.exporting = null; S.fullRes = false; S.qDirty = true; $('#recState').hidden = true; $('#rec').disabled = false;
     const res = ex && !ex.cancel ? { blob: new Blob(chunks, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' } : null;
     if (res) showResult(res.blob, res.ext);
     done(res);
@@ -930,12 +1391,12 @@ function drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, over) {
   const sr = S.buf.sampleRate, a = (T + S.shift) * sr, gain = fx.wfGain / 100;
   const cA = fx.wfColor === 'custom' ? fx.wfColA : (P.palette[0] || '#39c5bb'), cB = fx.wfColor === 'custom' ? fx.wfColB : (P.palette[1] || P.palette[0] || '#ff6fae');
   ctx.save(); ctx.globalAlpha = fx.wfOpacity / 100; ctx.shadowBlur = 0;
-  const left = keysW, span = W - keysW;
+  const rw = (W - keysW) * fx.wfW / 100, rh = H * fx.wfH / 100, left = keysW + (W - keysW - rw) * fx.wfPX / 100, span = rw, ry = (H - rh) * fx.wfPY / 100;
   if (fx.wfStyle === 'scope') {
     const N = Math.round(sr * 0.045), pts = 512; const buf = audioSamples(a - N / 2, N, S.wfScope && S.wfScope.length >= N ? S.wfScope : (S.wfScope = new Float32Array(N + 4)));
     let st = 0; for (let i = 1; i < N * 0.3; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { st = i; break; }
-    const len = N - st - 1, cy = H * (1 - fx.wfScopeY / 100), amp = H * 0.3 * gain;
-    ctx.strokeStyle = cA; ctx.lineWidth = fx.wfScopeW * sc; ctx.lineJoin = 'round'; ctx.shadowColor = cA; ctx.shadowBlur = 14 * sc;
+    const len = N - st - 1, cy = ry + rh * (1 - fx.wfScopeY / 100), amp = rh * 0.3 * gain;
+    ctx.strokeStyle = cA; ctx.lineWidth = fx.wfScopeW * sc; ctx.lineJoin = 'round'; ctx.shadowColor = cA; ctx.shadowBlur = liteOn() ? 0 : 14 * sc;
     ctx.beginPath(); for (let i = 0; i < pts; i++) { const v = buf[st + Math.floor(i / (pts - 1) * len)], x = left + span * i / (pts - 1), y = cy - clamp(v, -1, 1) * amp; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.shadowBlur = 0;
   }
   if (fx.wfStyle === 'bars' || fx.wfStyle === 'keys') {
@@ -943,22 +1404,22 @@ function drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, over) {
     if (S.wfKey !== key) { S.wfMag = FFT(audioSamples(a - FFTN / 2, FFTN, wfBuf)); S.wfKey = key; }
     const mag = S.wfMag, hz = sr / FFTN;
     if (fx.wfStyle === 'bars') {
-      const n = fx.wfBarN, bw = span / n, maxH = H * fx.wfBarH / 100, f0 = 50, f1 = Math.min(12000, sr / 2 - 1), r = Math.pow(f1 / f0, 1 / n), pos = fx.wfBarPos;
-      const g = ctx.createLinearGradient(0, pos === 'top' ? 0 : H - maxH, 0, pos === 'top' ? maxH : H);
+      const n = fx.wfBarN, bw = span / n, maxH = rh * fx.wfBarH / 100, f0 = 50, f1 = Math.min(12000, sr / 2 - 1), r = Math.pow(f1 / f0, 1 / n), pos = fx.wfBarPos;
+      const bot = ry + rh, g = ctx.createLinearGradient(0, pos === 'top' ? ry : bot - maxH, 0, pos === 'top' ? ry + maxH : bot);
       if (pos === 'top') { g.addColorStop(0, cA); g.addColorStop(1, cB); } else { g.addColorStop(0, cB); g.addColorStop(1, cA); }
-      if (pos === 'center') { const g2 = ctx.createLinearGradient(0, H / 2 - maxH / 2, 0, H / 2 + maxH / 2); g2.addColorStop(0, cB); g2.addColorStop(0.5, cA); g2.addColorStop(1, cB); ctx.fillStyle = g2; } else ctx.fillStyle = g;
+      if (pos === 'center') { const g2 = ctx.createLinearGradient(0, ry + rh / 2 - maxH / 2, 0, ry + rh / 2 + maxH / 2); g2.addColorStop(0, cB); g2.addColorStop(0.5, cA); g2.addColorStop(1, cB); ctx.fillStyle = g2; } else ctx.fillStyle = g;
       for (let i = 0; i < n; i++) {
         const v = dbNorm(binMax(mag, f0 * Math.pow(r, i), f0 * Math.pow(r, i + 1), hz), 70, 60, gain), hh = Math.max(0, v * maxH); if (hh < 1) continue;
         const x = left + i * bw + bw * 0.08, w = Math.max(1, bw * 0.84);
-        if (pos === 'center') rr(x, H / 2 - hh / 2, w, hh, Math.min(w / 2, 3 * sc)); else rr(x, pos === 'top' ? 0 : H - hh, w, hh, Math.min(w / 2, 3 * sc)); ctx.fill();
+        if (pos === 'center') rr(x, ry + rh / 2 - hh / 2, w, hh, Math.min(w / 2, 3 * sc)); else rr(x, pos === 'top' ? ry : bot - hh, w, hh, Math.min(w / 2, 3 * sc)); ctx.fill();
       }
     }
     if (fx.wfStyle === 'keys') {
-      const maxL = span * fx.wfKeyLen / 100, right = fx.wfKeySide === 'right';
+      const maxL = span * fx.wfKeyLen / 100, right = fx.wfKeySide === 'right', rEdge = left + span;
       for (let p = loI; p <= hiI; p++) {
         const f = 440 * Math.pow(2, (p - 69) / 12); if (f < 30 || f > sr / 2 - 1) continue;
         const v = dbNorm(binMax(mag, f * Math.pow(2, -0.5 / 12), f * Math.pow(2, 0.5 / 12), hz), 72, 55, gain), len = Math.pow(v, 1.15) * maxL; if (len < 1) continue;
-        const x0 = right ? W - len : left, g = ctx.createLinearGradient(right ? W : left, 0, right ? W - len : left + len, 0);
+        const x0 = right ? rEdge - len : left, g = ctx.createLinearGradient(right ? rEdge : left, 0, right ? rEdge - len : left + len, 0);
         g.addColorStop(0, cB); g.addColorStop(1, cA); ctx.globalAlpha = fx.wfOpacity / 100 * 0.85; ctx.fillStyle = g;
         ctx.fillRect(x0, (hi - p) * rowH + rowH * 0.1, len, rowH * 0.8);
       }
@@ -995,8 +1456,12 @@ function lyricTrack() {
   return best;
 }
 function refreshLines() {
-  const src = lyricTrack(), ph = src ? UVLyrics.phrases(src.t, src.f.offset / 1000) : [];
+  const src = lyricTrack(), pre = src ? tkey(src.f, src.t) + '|' : '', ms = n => Math.round(n.t0 * 1000);
+  const ph = src ? UVLyrics.phrases(src.t, src.f.offset / 1000, undefined, n => look.lo[pre + ms(n)]) : []; S.lyrTr = src ? src.t : null;
   S.lines = UVLyrics.buildLines(fx.lyrSrc, ph, look.lyricText || '', S.duration); S.linesDirty = false;
+  S.loN = Object.keys(look.lo).length;
+  for (const L of S.lines) for (const tk of L.tokens) if (tk.n) tk.key = pre + ms(tk.n);
+  if (!S.editing) renderLoList();
   S.lines2 = (look.lyricText2 || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const info = $('#lyrInfo'); if (!info) return;
   const rows = (look.lyricText || '').split(/\r?\n/).filter(x => x.trim()).length;
@@ -1008,59 +1473,153 @@ function refreshLines() {
 function drawLyricBox(W, H, sc, keysW, P, T) {
   if (!fx.lyrShow || !S.lines.length) return;
   const cur = UVLyrics.current(S.lines, T); if (!cur || cur.alpha <= 0.01) return;
-  const L = cur.line, mg = Math.max(14 * sc, H * 0.025), fs = 28 * sc * fx.lyrSize / 100, maxW = Math.min(W * 0.42, W - keysW - 2 * mg);
-  ctx.save(); ctx.font = '650 ' + fs + 'px ' + FONT; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  // empty tokens are notes whose text was cleared in the editor
+  const L = Object.assign({}, cur.line, { tokens: cur.line.tokens.filter(t => t.text !== '') }); if (!L.tokens.length) return;
+  const mg = Math.max(14 * sc, H * 0.025), fs = 28 * sc * fx.lyrSize / 100, maxW = Math.min(W * 0.42, W - keysW - 2 * mg);
+  const cs = t => caseOf(t, fx.lbCase), shadow = fx.lbShadow || !fx.lyrBox;
+  ctx.save(); ctx.font = fontStr('lb', fx.lbWeight, fs); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; setSpacing(fx.lbSpacing * sc);
   const spW = ctx.measureText(' ').width, sepAfter = tk => (L.join === ' ' || tk.gap ? spW : 0), rows = [];
   let row = { items: [], w: 0 };
   for (const tk of L.tokens) {
-    const tw = ctx.measureText(tk.text).width, lead = row.items.length ? sepAfter(row.items[row.items.length - 1].tk) : 0;
+    const txt = cs(tk.text), tw = ctx.measureText(txt).width, lead = row.items.length ? sepAfter(row.items[row.items.length - 1].tk) : 0;
     if (row.items.length && row.w + lead + tw > maxW && rows.length < 2) { rows.push(row); row = { items: [], w: 0 }; }
     const gapBefore = row.items.length ? sepAfter(row.items[row.items.length - 1].tk) : 0;
-    row.w += gapBefore + tw; row.items.push({ tk, tw, gapBefore });
+    row.w += gapBefore + tw; row.items.push({ tk, txt, tw, gapBefore });
   }
   rows.push(row);
   // optional second line: romaji of the kana, or a line the user typed
-  const fs2 = fs * 0.62, lh2 = fs2 * 1.45; let sec = null, w2 = 0;
+  const fs2 = fs * fx.lbSec / 100, lh2 = fs2 * 1.45; let sec = null, w2 = 0;
   if (fx.lyr2 === 'romaji') {
     const rt = UVLyrics.romajiTokens(L);
-    if (rt.some((x, i) => x.text !== L.tokens[i].text)) { ctx.font = '600 ' + fs2 + 'px ' + FONT; const sp2 = ctx.measureText(' ').width; sec = rt.map(x => { const tw = ctx.measureText(x.text).width; return { x, tw, sp: x.sp ? sp2 : 0 }; }); w2 = sec.reduce((a, o) => a + o.tw + o.sp, 0) - (sec.length ? sec[sec.length - 1].sp : 0); }
+    if (rt.some((x, i) => x.text !== L.tokens[i].text)) { ctx.font = fontStr('lb', 600, fs2); const sp2 = ctx.measureText(' ').width; sec = rt.map(x => { const t = cs(x.text), tw = ctx.measureText(t).width; return { x, t, tw, sp: x.sp ? sp2 : 0 }; }); w2 = sec.reduce((a, o) => a + o.tw + o.sp, 0) - (sec.length ? sec[sec.length - 1].sp : 0); }
   } else if (fx.lyr2 === 'typed' && S.lines2[cur.idx]) {
-    ctx.font = '600 ' + fs2 + 'px ' + FONT; const txt = S.lines2[cur.idx]; sec = [{ x: { text: txt, t: -1 }, tw: ctx.measureText(txt).width, sp: 0, plain: true }]; w2 = sec[0].tw;
+    ctx.font = fontStr('lb', 600, fs2); const txt = cs(S.lines2[cur.idx]); sec = [{ x: { text: txt, t: -1 }, t: txt, tw: ctx.measureText(txt).width, sp: 0, plain: true }]; w2 = sec[0].tw;
   }
-  const wid = Math.max(...rows.map(r => r.w), w2), k = Math.min(1, maxW / wid), lh = fs * 1.3, padX = 18 * sc, padY = 12 * sc;
-  const nextTxt = fx.lyrNext && cur.next ? cur.next.tokens.map(t => t.text).join(cur.next.join) : '';
+  let nextTxt = ''; if (fx.lyrNext && cur.next) nextTxt = cs(cur.next.tokens.filter(t => t.text !== '').map(t => t.text).join(cur.next.join));
+  ctx.font = fontStr('lb', 600, fs * 0.7); const nW = nextTxt ? Math.min(ctx.measureText(nextTxt).width, maxW) : 0;
+  const wid = Math.max(...rows.map(r => r.w), w2, nW), k = Math.min(1, maxW / wid), lh = fs * fx.lbLine / 100, padX = 18 * sc * fx.lbPad / 100, padY = 12 * sc * fx.lbPad / 100;
   const bw = wid * k + padX * 2, bh = (rows.length * lh + (sec ? lh2 : 0) + (nextTxt ? lh * 0.8 : 0)) * k + padY * 2;
   const left = fx.lyrPos === 'bl' || fx.lyrPos === 'tl', center = fx.lyrPos === 'bc', top = fx.lyrPos === 'tl' || fx.lyrPos === 'tr';
   const x = center ? (W + keysW - bw) / 2 : left ? keysW + mg : W - mg - bw;
   const capOff = top && left && look.caption ? 44 * sc : 0;
   const y = top ? mg + capOff : H - mg - bh;
   ctx.globalAlpha = cur.alpha;
-  if (fx.lyrBox) { ctx.fillStyle = css(hex2rgb(P.bg1), 0.8); rr(x, y, bw, bh, 14 * sc); ctx.fill(); ctx.strokeStyle = css(hex2rgb(P.grid), 0.4); ctx.lineWidth = Math.max(1, sc); ctx.stroke(); }
-  else { ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 8 * sc; }
+  if (fx.lyrBox) {
+    const pc = fx.lbPanel === 'black' ? '#000000' : fx.lbPanel === 'white' ? '#ffffff' : fx.lbPanel === 'custom' ? fx.lbPanelC : P.bg1;
+    if (fx.lbPanelA > 0) { ctx.fillStyle = css(hex2rgb(pc), fx.lbPanelA / 100); rr(x, y, bw, bh, fx.lbRadius * sc); ctx.fill(); ctx.strokeStyle = css(hex2rgb(P.grid), 0.4 * fx.lbPanelA / 100); ctx.lineWidth = Math.max(1, sc); ctx.stroke(); }
+  }
   ctx.translate(x + padX, y + padY); ctx.scale(k, k);
-  const sung = css(hex2rgb(P.act || P.hi)), idle = P.fg;
-  ctx.font = '650 ' + fs + 'px ' + FONT;
+  const sung = fx.lbLit === 'custom' ? fx.lbLitC : fx.lbLit === 'track' && S.lyrTr ? S.lyrTr.color : css(hex2rgb(P.act || P.hi));
+  const idle = fx.lbColor === 'custom' ? fx.lbColorC : P.fg, al = fx.lbAlign, off = w => al === 'center' ? (wid - w) / 2 : al === 'right' ? wid - w : 0;
+  ctx.font = fontStr('lb', fx.lbWeight, fs);
+  const teOf = new Map(L.tokens.map((t, i) => [t, L.tokens[i + 1] ? L.tokens[i + 1].t : (L.t1 || t.t + 0.5)]));
   rows.forEach((r, ri) => {
-    let px = 0; const cy = (ri + 0.5) * lh;
+    let px = off(r.w); const cy = (ri + 0.5) * lh;
     r.items.forEach(it => {
       px += it.gapBefore;
-      ctx.fillStyle = fx.lyrKaraoke && T >= it.tk.t ? sung : idle;
-      ctx.globalAlpha = cur.alpha * (fx.lyrKaraoke && T < it.tk.t ? 0.62 : 1);
-      ctx.fillText(it.tk.text, px, cy); px += it.tw;
+      const kar = fx.lyrKaraoke, on = kar && T >= it.tk.t, te = teOf.get(it.tk), prog = clamp((T - it.tk.t) / Math.max(0.05, te - it.tk.t), 0, 1), live = on && T < te;
+      const ks = fx.lbKStyle, ua = fx.lbUnsung / 100;
+      if (kar && ks === 'sweep') {
+        ctx.globalAlpha = cur.alpha * (on && prog >= 1 ? 0 : ua);
+        if (!(on && prog >= 1)) putText(it.txt, px, cy, idle, fx.lbOut, shadow, sc);
+        if (on) {
+          ctx.save(); ctx.beginPath(); ctx.rect(px - 4 * sc, cy - lh, it.tw * prog + 4 * sc, lh * 2); ctx.clip();
+          ctx.globalAlpha = cur.alpha; putText(it.txt, px, cy, sung, fx.lbOut, shadow, sc); ctx.restore();
+        }
+      } else {
+        ctx.globalAlpha = cur.alpha * (kar && !on ? ua : 1);
+        if (kar && ks === 'pop' && live) {
+          const g = 1 + 0.16 * Math.sin(Math.PI * prog); ctx.save(); ctx.translate(px + it.tw / 2, cy); ctx.scale(g, g); ctx.translate(-(px + it.tw / 2), -cy);
+          putText(it.txt, px, cy, sung, fx.lbOut, shadow, sc); ctx.restore();
+        } else putText(it.txt, px, cy, on ? sung : idle, fx.lbOut, shadow, sc);
+        if (kar && ks === 'underline' && live) { ctx.globalAlpha = cur.alpha; ctx.fillStyle = sung; ctx.fillRect(px, cy + fs * 0.52, it.tw, Math.max(2, fs * 0.07)); }
+      }
+      px += it.tw;
     });
   });
   let yy = rows.length * lh;
   if (sec) {
-    ctx.font = '600 ' + fs2 + 'px ' + FONT; let px = 0;
+    ctx.font = fontStr('lb', 600, fs2); let px = off(w2);
     for (const o of sec) {
       const on = !o.plain && fx.lyrKaraoke && T >= o.x.t;
-      ctx.fillStyle = on ? sung : idle; ctx.globalAlpha = cur.alpha * (on ? 0.95 : 0.55);
-      ctx.fillText(o.x.text, px, yy + lh2 / 2); px += o.tw + o.sp;
+      ctx.globalAlpha = cur.alpha * (on ? 0.95 : 0.55);
+      putText(o.t, px, yy + lh2 / 2, on ? sung : idle, fx.lbOut, shadow, sc); px += o.tw + o.sp;
     }
     yy += lh2;
   }
-  if (nextTxt) { ctx.font = '600 ' + fs * 0.7 + 'px ' + FONT; ctx.globalAlpha = cur.alpha * 0.5; ctx.fillStyle = idle; ctx.fillText(fitText(nextTxt, wid), 0, yy + lh * 0.4); }
+  if (nextTxt) { ctx.font = fontStr('lb', 600, fs * 0.7); ctx.globalAlpha = cur.alpha * 0.5; putText(fitText(nextTxt, wid), off(nW), yy + lh * 0.4, idle, fx.lbOut, shadow, sc); }
   ctx.restore();
+}
+
+
+// ---- Editor tab: the settings that get reached for most, plus per-note lyric editing
+function fillQuickThemes() {
+  const sel = $('#qTheme'); if (!sel) return; sel.replaceChildren();
+  for (const [g, title] of [['Yours', 'Yours'], ['Editors', 'Editor styles'], ['Characters', 'Characters'], ['Colors', 'Color themes']]) {
+    const names = Object.keys(PRESETS).filter(n => PRESETS[n].g === g); if (!names.length) continue;
+    sel.append(h('optgroup', { label: title }, names.map(n => h('option', { value: n }, PRESETS[n].label ? PRESETS[n].shade + ' ' + PRESETS[n].label : n))));
+  }
+  sel.value = look.preset;
+}
+function buildEditor() {
+  const q = $('#quick'); if (!q) return;
+  const acc = (title, kids, open) => { const d = h('details', { class: 'ac' }, h('summary', null, title), h('div', { class: 'acbody' }, ...kids)); if (open) d.open = true; return d; };
+  const ctl = k => makeCtl(FXMAP[k], 'q-');
+  const chk = (id, label, get, set) => h('label', { class: 'chk', for: id }, h('input', { type: 'checkbox', id, onchange: e => { set(e.target.checked); syncVisInputs(); save(); } }), h('span', null, label));
+  const shade = h('div', { class: 'seg', role: 'group', 'aria-label': 'Viewer light or dark' }, [['dark', 'Dark'], ['light', 'Light']].map(([v, l]) => h('button', { class: 'btn small qshade', type: 'button', 'data-v': v, onclick: () => { look.shade = v; applyPreset(look.preset, look.auto); } }, l)));
+  const theme = h('div', { class: 'row stack' }, h('label', { for: 'qTheme' }, 'Theme'), h('select', { id: 'qTheme', onchange: e => applyPreset(e.target.value) }));
+  theme.dataset.tip = 'Pick a look for the piano roll and the exported video. The full list with previews is in the Look tab.';
+  q.append(
+    acc('Quick settings', [theme, shade,
+      ctl('pitch'), ctl('pitchMode'), ctl('glow'), ctl('highlight'),
+      ctl('lyrics'), ctl('lyricSize'),
+      chk('qLyrShow', 'Show the lyric box', () => fx.lyrShow, v => { fx.lyrShow = v; }),
+      chk('qPortShow', 'Show portraits', () => fx.portShow, v => { fx.portShow = v; }),
+      ctl('wfStyle'), ctl('window'), ctl('noteH'), ctl('follow'), ctl('pvQ'), ctl('pvLite')], true),
+    acc('Lyric box text, note by note', [
+      h('p', { class: 'hint', id: 'loHint' }),
+      ctl('lyrRoll'),
+      h('div', { class: 'btns' },
+        h('button', { class: 'btn small', type: 'button', id: 'loReset', onclick: () => { look.lo = {}; save(); refreshLines(); } }, 'Undo all edits'),
+        h('label', { class: 'chk', for: 'loFollow', style: 'margin:0' }, h('input', { type: 'checkbox', id: 'loFollow' }), h('span', null, 'Follow playback'))),
+      h('div', { id: 'loList', class: 'lolist' })], false));
+  q.querySelector('#loReset').dataset.tip = 'Put every note back to the lyric written in the project.';
+  fillQuickThemes();
+}
+function renderLoList() {
+  const box = $('#loList'), hint = $('#loHint'); if (!box) return;
+  box.replaceChildren(); S.loRows = []; S.loIdx = -1;
+  if (fx.lyrSrc !== 'notes') { hint.textContent = 'Note-by-note editing works while the lyric box takes its lyrics from the notes (Editor tab).'; return; }
+  const src = lyricTrack();
+  if (!S.lines.length || !src) { hint.textContent = 'No lyrics found in the loaded notes.'; return; }
+  hint.textContent = 'Change what the lyric box shows for each note. Clear a box to hide that note’s syllable. The project and the lyrics on the roll stay as they are unless you turn that on below.';
+  S.lines.forEach((L, li) => {
+    const row = h('div', { class: 'lorow' }, h('button', { class: 'lot', type: 'button', title: 'Jump to this line', onclick: () => seek(Math.max(0, L.t0 - 0.3)) }, fmt(L.t0)));
+    for (const tk of L.tokens) {
+      if (!tk.key) continue;
+      const inp = h('input', {
+        type: 'text', class: 'loi' + (tk.key in look.lo ? ' mod' : ''), value: tk.text, size: Math.max(2, Array.from(tk.text).length + 1), spellcheck: 'false', 'aria-label': 'Lyric of the note at ' + fmt(tk.t),
+        oninput: e => {
+          const v = e.target.value;
+          if (v === tk.orig) delete look.lo[tk.key]; else look.lo[tk.key] = v;
+          e.target.classList.toggle('mod', tk.key in look.lo); e.target.size = Math.max(2, Array.from(v).length + 1);
+          save(); S.editing = true; refreshLines(); S.editing = false;
+        }
+      });
+      row.append(inp);
+    }
+    box.append(row); S.loRows.push(row);
+  });
+}
+function markLoRow() {
+  if (!S.loRows || !S.loRows.length || !$('#quick').offsetParent) return;
+  const c = UVLyrics.current(S.lines, S.time), idx = c ? c.idx : -1;
+  if (idx === S.loIdx) return;
+  if (S.loRows[S.loIdx]) S.loRows[S.loIdx].classList.remove('now');
+  S.loIdx = idx; const r = S.loRows[idx]; if (!r) return;
+  r.classList.add('now');
+  const list = $('#loList'), f = $('#loFollow');
+  if (f && f.checked && list.offsetParent) list.scrollTop = Math.max(0, r.offsetTop - list.offsetTop - list.clientHeight / 3);
 }
 
 // visuals tab
@@ -1084,10 +1643,10 @@ function renderVis() {
   sel.value = [...sel.options].some(o => o.value === look.lyrTrack) ? look.lyrTrack : 'auto';
   $('#lyrTrack').disabled = !S.files.length;
 }
-function syncVisInputs() { $('#portShow').checked = !!fx.portShow; $('#lyrShow').checked = !!fx.lyrShow; $('#lyrSrc').value = fx.lyrSrc; $('#lyrText').value = look.lyricText || ''; $('#lyr2').value = fx.lyr2; $('#lyrText2').value = look.lyricText2 || ''; $('#lyrText2').hidden = fx.lyr2 !== 'typed'; }
+function syncVisInputs() { $('#portShow').checked = !!fx.portShow; $('#lyrShow').checked = !!fx.lyrShow; const a = $('#qLyrShow'), b = $('#qPortShow'); if (a) a.checked = !!fx.lyrShow; if (b) b.checked = !!fx.portShow; $('#lyrSrc').value = fx.lyrSrc; $('#lyrText').value = look.lyricText || ''; $('#lyr2').value = fx.lyr2; $('#lyrText2').value = look.lyricText2 || ''; $('#lyrText2').hidden = fx.lyr2 !== 'typed'; }
 $('#fileBg').addEventListener('change', e => { if (e.target.files[0]) setBg(e.target.files[0]); e.target.value = ''; });
-$('#portShow').addEventListener('change', e => { fx.portShow = e.target.checked; save(); });
-$('#lyrShow').addEventListener('change', e => { fx.lyrShow = e.target.checked; save(); });
+$('#portShow').addEventListener('change', e => { fx.portShow = e.target.checked; syncVisInputs(); save(); });
+$('#lyrShow').addEventListener('change', e => { fx.lyrShow = e.target.checked; syncVisInputs(); save(); });
 $('#lyrSrc').addEventListener('change', e => { fx.lyrSrc = e.target.value; save(); refreshLines(); });
 $('#lyrTrack').addEventListener('change', e => { look.lyrTrack = e.target.value; save(); refreshLines(); });
 $('#lyrText').addEventListener('input', e => { look.lyricText = e.target.value; save(); refreshLines(); });
@@ -1253,8 +1812,37 @@ $('#qClear').addEventListener('click', () => { S.queue = []; $('#qState').textCo
 
 // init
 $('#ver').textContent = 'v' + VERSION;
-updateP(); setSize(); buildFx(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
+// ---- hover tips: small notes that appear next to a control, and can be switched off
+let tipsOn = true; try { tipsOn = localStorage.getItem('utaviewer.tips') !== 'off'; } catch (e) {}
+const tipEl = h('div', { id: 'tip', role: 'tooltip', hidden: true }); document.body.append(tipEl);
+let tipTimer = 0, tipFor = null;
+function hideTip() { clearTimeout(tipTimer); tipFor = null; tipEl.hidden = true; }
+function showTip(el) {
+  const text = el.dataset.tip; if (!text || !tipsOn) return;
+  tipEl.textContent = text; tipEl.hidden = false;
+  const r = el.getBoundingClientRect(), tw = tipEl.offsetWidth, th = tipEl.offsetHeight, rail = el.closest('.rail');
+  let x, y;
+  if (rail) { const rr2 = rail.getBoundingClientRect(); x = rail.id === 'railR' ? rr2.left - tw - 10 : rr2.right + 10; y = r.top + r.height / 2 - th / 2; }
+  else { x = r.left + r.width / 2 - tw / 2; y = r.bottom + 8; if (y + th > innerHeight - 6) y = r.top - th - 8; }
+  tipEl.style.left = Math.round(clamp(x, 6, innerWidth - tw - 6)) + 'px'; tipEl.style.top = Math.round(clamp(y, 6, innerHeight - th - 6)) + 'px';
+}
+function tipTarget(e) {
+  const el = e.target.closest ? e.target.closest('[data-tip],[title]') : null; if (!el) return null;
+  if (el.hasAttribute('title')) { if (!el.dataset.tip) el.dataset.tip = el.getAttribute('title'); el.removeAttribute('title'); }
+  return el;
+}
+document.addEventListener('mouseover', e => { const el = tipTarget(e); if (el === tipFor) return; hideTip(); if (!el || !tipsOn) return; tipFor = el; tipTimer = setTimeout(() => showTip(el), 450); });
+document.addEventListener('mouseout', e => { if (tipFor && !(e.relatedTarget && tipFor.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener('focusin', e => { const el = tipTarget(e); if (el && tipsOn && e.target.matches(':focus-visible')) { hideTip(); tipFor = el; showTip(el); } });
+document.addEventListener('focusout', hideTip); document.addEventListener('pointerdown', hideTip); document.addEventListener('scroll', hideTip, true); document.addEventListener('keydown', hideTip);
+function syncTipsBtn() { const b = $('#btnTips'); b.textContent = 'Tips: ' + (tipsOn ? 'On' : 'Off'); b.setAttribute('aria-pressed', String(tipsOn)); }
+$('#btnTips').addEventListener('click', () => { tipsOn = !tipsOn; try { localStorage.setItem('utaviewer.tips', tipsOn ? 'on' : 'off'); } catch (e) {} hideTip(); syncTipsBtn(); msg(tipsOn ? 'Hover tips on.' : 'Hover tips off.'); });
+for (const [sel, text] of STATIC_TIPS) document.querySelectorAll(sel).forEach(el => { el.dataset.tip = text; el.removeAttribute('title'); });
+syncTipsBtn();
+updateP(); setSize(); buildFx(); buildEditor(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
 msg('Add project files or drop them on the preview to begin. Only UST files layer together.');
 try { const p = window.claude && window.claude.use ? window.claude.use('downloads') : null; if (p) p.then(d => { S.dl = d; }).catch(() => {}); } catch (e) {}
 requestAnimationFrame(loop);
+// test hook, only with ?test in the address
+if (/[?&]test\b/.test(location.search)) window.__uv = { S, fx, look, PRESETS, allTracks, trackLine, applyPreset, buildPresets, seek, draw, parseTracks: null };
 })();
