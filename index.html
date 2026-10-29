@@ -24,9 +24,10 @@
       <button class="btn" id="btnTips" type="button" aria-pressed="true">Tips: On</button>
       <button class="btn" id="btnHelp" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
       <button class="btn primary" id="btnExport" type="button">Export</button>
-      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln">
+      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl">
       <input id="fileAudio" type="file" hidden accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a">
       <input id="filePort" type="file" hidden accept="image/*">
+      <input id="fileLs" type="file" multiple hidden accept="image/*">
       <input id="fileBg" type="file" hidden accept="image/*,video/*">
       <input id="fileLyr" type="file" hidden accept=".txt,.lrc,text/plain">
       <input id="fileTheme" type="file" hidden accept=".json,application/json">
@@ -71,7 +72,7 @@
         <textarea id="lyrText2" rows="5" spellcheck="false" hidden placeholder="One line for each lyric line, in the same order."></textarea>
         <label class="chk" for="lyrShow"><input type="checkbox" id="lyrShow"><span>Show the lyric box</span></label>
         <p class="hint" id="lyrInfo"></p>
-        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsq</code> <code>.vsqx</code> <code>.vpr</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code></div>
+        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsq</code> <code>.vsqx</code> <code>.vpr</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code> <code>.musicxml</code> and NEUTRINO projects as a <code>.zip</code> of the project folder</div>
       </div>
 
     </aside>
@@ -97,6 +98,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" aria-selected="true" data-tab="fx" type="button">Effects</button>
         <button role="tab" aria-selected="false" data-tab="look" type="button">Look</button>
+        <button role="tab" aria-selected="false" data-tab="ls" type="button">Lip sync</button>
         <button role="tab" aria-selected="false" data-tab="exp" type="button">Export</button>
       </div>
       <div class="pane" data-pane="fx" id="fxPane"></div>
@@ -137,6 +139,14 @@
         </div>
       </div>
 
+      <div class="pane" data-pane="ls" hidden>
+        <p class="hint">Give a track a set of mouth images. While it sings, the picture follows the vowel of the note: か shows the A image, し the I image, ん the N image, and the Silent image shows whenever nothing is sung. Optional, and it replaces that track's portrait while it is on.</p>
+        <div id="lsCtl"></div>
+        <div class="sec">Characters</div>
+        <div id="lsList"></div>
+        <p class="hint">Images are kept for this session only, like portraits. Name the files a, i, u, e, o, n and silent (or rest) and choose them all at once to fill a set in one go.</p>
+      </div>
+
       <div class="pane" data-pane="exp" hidden>
         <div class="sec">Background</div>
         <div class="row stack"><label for="bgMode">Video background</label>
@@ -155,14 +165,17 @@
         </div>
         <div class="sec">Range</div>
         <div class="rng">
-          <label for="expFrom">From (s)</label><input id="expFrom" type="number" min="0" step="0.1" placeholder="start"><button class="btn small" id="fromHere" type="button">Playhead</button>
+          <label for="expFrom">From (s)</label><input id="expFrom" type="number" min="0" step="0.1" placeholder="0.0"><button class="btn small" id="fromHere" type="button">Playhead</button>
           <label for="expTo">To (s)</label><input id="expTo" type="number" min="0" step="0.1" placeholder="end"><button class="btn small" id="toHere" type="button">Playhead</button>
         </div>
+        <div class="hint" id="rngInfo"></div>
+        <div class="row"><button class="btn small" id="rngAll" type="button">Whole project</button></div>
         <div class="sec">Record</div>
         <div class="row"><label for="fps">Frame rate</label>
           <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
         <div class="row"><label for="mbps">Video quality</label>
           <select id="mbps"><option value="4">Light (4 Mbps)</option><option value="8">Standard (8 Mbps)</option><option value="16">High (16 Mbps)</option></select></div>
+        <label class="chk" id="autoMp4Row" for="autoMp4"><input type="checkbox" id="autoMp4"><span>Convert to MP4 or fix the length after recording</span></label>
         <p class="hint">Recording plays the whole project once in real time and captures the canvas plus any loaded audio. Keep this tab in the foreground until it finishes.</p>
         <button class="btn primary" id="rec" type="button">Record video</button>
         <div id="recState" hidden>
@@ -180,11 +193,20 @@
           <button class="btn small" id="qClear" type="button">Clear</button>
         </div>
         <div class="hint" id="qState"></div>
-        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
+        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
         <div class="result" id="result" hidden>
           <video id="resVideo" controls playsinline hidden></video>
           <div class="hint" id="resInfo"></div>
           <button class="btn primary" id="resSave" type="button">Save file</button>
+          <div class="row" id="resConv" hidden>
+            <button class="btn small" id="resMp4" type="button">Convert to MP4</button>
+            <button class="btn small" id="resFix" type="button">Fix length</button>
+          </div>
+          <div id="convState" hidden>
+            <div class="bar"><i id="convBar"></i></div>
+            <div class="hint" id="convText" style="margin-top:6px"></div>
+            <button class="btn small" id="convCancel" type="button">Cancel</button>
+          </div>
         </div>
       </div>
     </aside>
@@ -216,7 +238,7 @@
     <dt>L</dt><dd>Show or hide the lyric box</dd>
     <dt>[ and ]</dt><dd>Loop start and end at the playhead</dd>
     <dt>R / Esc</dt><dd>Loop on or off / clear the loop</dd>
-    <dt>1 – 4</dt><dd>Editor, Effects, Look, Export</dd>
+    <dt>1 – 5</dt><dd>Editor, Effects, Look, Lip sync, Export</dd>
     <dt>?</dt><dd>This list</dd>
   </dl>
   <form method="dialog"><button class="btn primary" type="submit">Close</button></form>

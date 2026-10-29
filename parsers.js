@@ -587,7 +587,130 @@ function parseVSQ(buf) {
   return { fmt: 'VSQ', title: '', tm, tracks };
 }
 
-const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsq: 'a VOCALOID 2 project', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project' };
+
+// ---- NEUTRINO (project folder as a .zip, or its score.xml) and MusicXML
+// What a NEUTRINO or MusicXML lyric means: breaths and pauses are rests, "cl" is a closure that is not sung.
+function ntLyric(s, breath) {
+  const t = (s || '').trim();
+  if (breath || /^(?:br\d*|pau|sil|sp)$/i.test(t)) return { t: '', rest: true };
+  if (/^cl$/i.test(t)) return { t: '', rest: false };
+  return { t: cleanLyric(t), rest: false };
+}
+function xmlKids(el, tag) { return Array.from(el ? el.children : []).filter(c => c.localName === tag); }
+function xmlFirst(el, tag) { return xmlKids(el, tag)[0] || null; }
+function xmlNum(el, tag, d) { const c = xmlFirst(el, tag), v = c ? parseFloat(c.textContent) : NaN; return isFinite(v) ? v : d; }
+
+// the project folder keeps the notes (edit/score.xml), the pitch curve (edit/pitch.bin: 64-bit floats in Hz, one every 10 ms)
+// and, once rendered, one sound file and phoneme list per phrase.
+function ntScore(text, f0) {
+  const doc = new DOMParser().parseFromString(text.replace(/^﻿/, ''), 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('Invalid XML');
+  const root = doc.documentElement; if (!root || root.localName !== 'Score') throw new Error('Not a NEUTRINO score');
+  const res = parseInt(root.getAttribute('resolution'), 10) || 480;
+  const tempos = Array.from(root.getElementsByTagName('Tempo')).map(t => ({ tick: parseInt(t.getAttribute('position'), 10) || 0, bpm: parseFloat(t.getAttribute('tempo')) }));
+  const tm = makeTempoMap(tempos, res), notes = [];
+  for (const n of Array.from(root.getElementsByTagName('Note'))) {
+    const pos = parseInt(n.getAttribute('position'), 10), dur = parseInt(n.getAttribute('duration'), 10), num = parseInt(n.getAttribute('note-number'), 10);
+    if (!isFinite(pos) || !(dur > 0) || !isFinite(num)) continue;
+    const ly = ntLyric(n.getAttribute('lyric'), n.getAttribute('breath') === 'true');
+    const t0 = tm.t2s(pos), t1 = tm.t2s(pos + dur);
+    const pf = f0 ? (t => { const v = f0(t); return v > 0 ? 69 + 12 * Math.log2(v / 440) - num : 0; }) : null;
+    const nn = mkNote(t0, t1, num, ly.t, [pf]);
+    if (ly.rest) nn.rest = true;
+    notes.push(nn);
+  }
+  notes.sort((a, b) => a.t0 - b.t0);
+  return { tm, notes };
+}
+function ntF0(buf) {
+  const n = Math.floor(buf.byteLength / 8); if (n < 2) return null;
+  const v = new Float64Array(buf.slice(0, n * 8)); let ok = 0;
+  for (let i = 0; i < v.length; i += 7) if (v[i] > 20 && v[i] < 4000) ok++;
+  if (!ok) return null;
+  return t => {
+    const x = t / 0.01, i = Math.floor(x); if (i < 0 || i + 1 >= v.length) return 0;
+    const a = v[i], b = v[i + 1]; if (!(a > 0)) return 0; if (!(b > 0)) return a;
+    return Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * (x - i));
+  };
+}
+async function parseNTPJ(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  let sc = zip.file(/(^|\/)edit\/score\.xml$/i)[0];
+  if (!sc) { const inner = zip.file(/\.zip$/i)[0]; if (inner) return parseNTPJ(await inner.async('arraybuffer')); sc = zip.file(/(^|\/)score\.xml$/i)[0]; }
+  if (!sc) throw new Error('No NEUTRINO project found in this zip. Zip the whole project folder, the one with the edit and render folders.');
+  const base = sc.name.replace(/edit\/score\.xml$/i, '').replace(/score\.xml$/i, '');
+  const pb = zip.file(base + 'edit/pitch.bin') || zip.file(new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 'edit/pitch\\.bin$', 'i'))[0];
+  const f0 = pb ? ntF0(await pb.async('arraybuffer')) : null;
+  const { tm, notes } = ntScore(await sc.async('string'), f0);
+  const name = (base.replace(/\/$/, '').split('/').pop() || 'NEUTRINO');
+  const out = { fmt: 'NEUTRINO', variant: f0 ? 'with pitch' : '', title: name, tm, tracks: [{ name: 'Vocal', notes }] };
+  // rendered phrases: the sound of each one, and its phonemes
+  const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), vocals = [], phones = [];
+  for (const wf of zip.file(new RegExp('^' + esc + 'render/phrases/phrase\\d+/audio\\.wav$', 'i'))) {
+    const dir = wf.name.replace(/audio\.wav$/i, ''), tf = zip.file(dir + 'timing.txt'); if (!tf) continue;
+    const rows = (await tf.async('string')).split(/\r?\n/).map(l => l.trim().split(/\s+/)).filter(r => r.length >= 4 && isFinite(+r[0]));
+    if (!rows.length) continue;
+    for (const r of rows) phones.push({ t0: +r[0] / 1e7, t1: +r[1] / 1e7, v: r[2] === '1', ph: r[3] });
+    vocals.push({ t0: +rows[0][0] / 1e7, data: await wf.async('arraybuffer') });
+  }
+  if (vocals.length) { out.vocals = vocals; out.phones = phones.sort((a, b) => a.t0 - b.t0); }
+  return out;
+}
+function parseMusicXML(text) {
+  const doc = new DOMParser().parseFromString(text.replace(/^﻿/, ''), 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('Invalid XML');
+  const root = doc.documentElement;
+  if (!root || root.localName !== 'score-partwise') throw new Error('Not a MusicXML score (only part-wise scores are supported)');
+  const RES = 960, STEP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }, names = {}, tempos = [], seen = new Set(), raw = [];
+  for (const sp of Array.from(root.getElementsByTagName('score-part'))) { const pn = xmlFirst(sp, 'part-name'); names[sp.getAttribute('id')] = pn ? pn.textContent.trim() : ''; }
+  const addTempo = (tick, bpm) => { if (bpm > 0 && !seen.has(tick + '|' + bpm)) { seen.add(tick + '|' + bpm); tempos.push({ tick, bpm }); } };
+  let pi = 0;
+  for (const part of xmlKids(root, 'part')) {
+    pi++; let pos = 0, div = 1, last = null; const notes = [];
+    for (const m of xmlKids(part, 'measure')) {
+      let top = pos;
+      for (const el of Array.from(m.children)) {
+        const tag = el.localName, tk = d => Math.round(d * RES / div);
+        if (tag === 'attributes') div = xmlNum(el, 'divisions', div) || div;
+        else if (tag === 'direction' || tag === 'sound') {
+          const s = tag === 'sound' ? el : el.getElementsByTagName('sound')[0];
+          if (s && s.getAttribute('tempo') && pi === 1) addTempo(pos, parseFloat(s.getAttribute('tempo')));
+        } else if (tag === 'forward') { pos += tk(xmlNum(el, 'duration', 0)); top = Math.max(top, pos); }
+        else if (tag === 'backup') pos -= tk(xmlNum(el, 'duration', 0));
+        else if (tag === 'note') {
+          if (xmlFirst(el, 'grace') || xmlFirst(el, 'chord')) continue;
+          const ticks = tk(xmlNum(el, 'duration', 0)), pitch = xmlFirst(el, 'pitch');
+          if (pitch && ticks > 0) {
+            const step = xmlFirst(pitch, 'step'), midi = (xmlNum(pitch, 'octave', 4) + 1) * 12 + (STEP[step ? step.textContent.trim().toUpperCase() : 'C'] || 0) + xmlNum(pitch, 'alter', 0);
+            const stop = xmlKids(el, 'tie').some(t => t.getAttribute('type') === 'stop');
+            if (stop && last && last.midi === midi && last.end === pos) last.end += ticks;
+            else {
+              const ly = xmlFirst(el, 'lyric'), tx = ly ? xmlFirst(ly, 'text') : null;
+              last = { start: pos, end: pos + ticks, midi, lyric: tx ? tx.textContent : '' }; notes.push(last);
+            }
+          }
+          pos += ticks; top = Math.max(top, pos);
+        }
+      }
+      pos = Math.max(pos, top);
+    }
+    if (notes.length) raw.push({ name: names[part.getAttribute('id')] || ('Part ' + pi), notes });
+  }
+  if (!raw.length) throw new Error('No notes found');
+  const tm = makeTempoMap(tempos.length ? tempos : [{ tick: 0, bpm: 120 }], RES);
+  const tracks = raw.map(r => ({ name: r.name, notes: r.notes.map(n => { const ly = ntLyric(n.lyric, false), nn = mkNote(tm.t2s(n.start), tm.t2s(n.end), n.midi, ly.t, []); if (ly.rest) nn.rest = true; return nn; }) }));
+  return { fmt: 'MusicXML', title: '', tm, tracks };
+}
+async function parseMXL(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  let path = null; const c = zip.file('META-INF/container.xml');
+  if (c) { const m = (await c.async('string')).match(/full-path="([^"]+)"/); if (m) path = m[1]; }
+  const f = (path && zip.file(path)) || zip.file(/^(?!META-INF\/).*\.(xml|musicxml)$/i)[0];
+  if (!f) throw new Error('No score found inside this compressed MusicXML file');
+  return parseMusicXML(await f.async('string'));
+}
+
+const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsq: 'a VOCALOID 2 project', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project', zip: 'a NEUTRINO project', ntpj: 'a NEUTRINO project', xml: 'a MusicXML or NEUTRINO score', musicxml: 'a MusicXML file', mxl: 'a compressed MusicXML file' };
 async function parseProjectFile(file, bendRange) {
   const ext = file.name.split('.').pop().toLowerCase(), buf = await file.arrayBuffer();
   if (!KIND[ext]) throw new Error('Unsupported file type .' + ext);
@@ -602,6 +725,14 @@ async function parseProjectFile(file, bendRange) {
     else if (ext === 'vpr') r = await parseVPR(buf);
     else if (ext === 'svp') r = parseSVP(new Uint8Array(buf));
     else if (ext === 'ccs') r = parseCCS(decodeText(new Uint8Array(buf)));
+    else if (ext === 'zip') r = await parseNTPJ(buf);
+    else if (ext === 'ntpj') throw new Error('Not enough in a .ntpj file: it only points to the other files. Zip the whole NEUTRINO project folder and add that .zip instead.');
+    else if (ext === 'mxl') r = await parseMXL(buf);
+    else if (ext === 'xml' || ext === 'musicxml') {
+      const txt = decodeText(new Uint8Array(buf));
+      if (/<Score[\s>]/.test(txt.slice(0, 600)) && !/score-partwise/.test(txt.slice(0, 2000))) { const s = ntScore(txt, null); r = { fmt: 'NEUTRINO', title: '', tm: s.tm, tracks: [{ name: 'Vocal', notes: s.notes }] }; }
+      else r = parseMusicXML(txt);
+    }
     else r = parseTSSLN(new Uint8Array(buf));
   } catch (e) {
     // our own messages are already readable, parser internals are not

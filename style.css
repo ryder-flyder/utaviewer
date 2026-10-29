@@ -68,7 +68,7 @@ canvas#cv{display:block;max-width:100%;max-height:100%;background:#000;border-ra
 .tc{font-size:20px;font-weight:550;letter-spacing:.02em;text-align:right;white-space:nowrap}
 .tc small{font-size:12.5px;color:var(--mute);font-weight:450}
 .status{min-height:20px;font-size:12.5px;color:var(--mute);padding:3px 12px 6px;background:var(--panel)}
-.status.err{color:var(--err)} .status.ok{color:var(--ok)}
+.hint.err{color:var(--err)} .status.err{color:var(--err)} .status.ok{color:var(--ok)}
 input[type=range]{accent-color:var(--accent);width:100%}
 /* timeline */
 .tl{grid-area:tl;border-top:1px solid var(--line);background:var(--panel3);display:flex;flex-direction:column;min-width:0}
@@ -143,7 +143,7 @@ input[type=color]{width:26px;height:26px;padding:0;border:1px solid var(--line);
   .transport .tcL{display:none}
   .tlgrid{grid-template-columns:96px auto}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 /* full page app layout */
 html,body{height:100%}
@@ -207,3 +207,28 @@ details.pg>.presets:first-of-type{margin-top:2px}
 
 #tip{position:fixed;z-index:50;max-width:260px;padding:7px 10px;border-radius:6px;background:#14161c;color:#f1f3f8;font-size:12.5px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.28);pointer-events:none;border:1px solid rgba(255,255,255,.1)}
 #tip[hidden]{display:none}
+
+/* lip sync */
+.lsc{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--panel2)}
+.lsc .lh{display:flex;align-items:center;gap:8px}
+.lsc .lh .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.lsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
+.lss{border:1px solid var(--line);border-radius:7px;background:var(--bg);padding:3px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font:inherit;color:var(--fg)}
+.lss:hover{border-color:var(--mute)}
+.lss .im{width:100%;aspect-ratio:1;border-radius:5px;background:var(--panel3) center/contain no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:18px;font-weight:600}
+.lss .nm{font-size:11.5px;color:var(--mute)}
+.lss.now{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.lss.now .nm{color:var(--fg)}
+
+#convState{display:flex;flex-direction:column;gap:6px;align-items:flex-start}#convState .bar{width:100%}#resConv{display:flex;gap:8px;flex-wrap:wrap}#resConv[hidden],#convState[hidden]{display:none}
+
+/* motion: short, only colour/opacity/transform so it stays on the compositor */
+:root{--ease:cubic-bezier(.2,.7,.2,1)}
+.btn,.tabs button,select,input[type=text],input[type=number],.rz{transition:background-color .14s var(--ease),border-color .14s var(--ease),color .14s var(--ease),filter .14s var(--ease),transform .14s var(--ease)}
+.btn:active:not(:disabled){transform:scale(.97)}
+select:focus-visible,input[type=text]:focus-visible,input[type=number]:focus-visible{border-color:var(--accent)}
+.bar i{transition:width .2s linear}
+@keyframes uvIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes uvFade{from{opacity:0}to{opacity:1}}
+.pane:not([hidden]),.result:not([hidden]),#recState:not([hidden]),#convState:not([hidden]),#resConv:not([hidden]){animation:uvIn .18s var(--ease)}
+#tip:not([hidden]){animation:uvFade .12s ease-out}
