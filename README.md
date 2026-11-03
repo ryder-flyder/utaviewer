@@ -34,6 +34,7 @@ You can also drop in an audio file to play along with it.
 - An audio visualizer built from your audio: scope line, spectrum bars or piano-key spectrum, one at a time
 
 **Export**
+- Exact frame rendering: video is drawn and encoded one frame at a time, so the frame rate is exactly what you set, even on a slow computer (Chrome, Edge and the desktop apps; other browsers record live)
 - Video at 1920x1080 and 60 fps by default, as MP4 where your browser supports it. Otherwise it records WebM and the Export tab can convert it to MP4 with a bundled copy of ffmpeg (runs in the page, nothing is uploaded)
 - 16:9, 4:3, 9:16 or 1:1, with a start and end time
 - Transparent or green screen backgrounds, for overlaying in an editor
@@ -46,7 +47,7 @@ You can also drop in an audio file to play along with it.
 
 ## Using it
 
-Open the site, add your files and press play. When you're ready, go to Export and record. Recording runs in real time, so keep the tab open until it finishes.
+Open the site, add your files and press play. When you're ready, go to Export and record. Rendering can take longer than the song on a slow computer. Live recording runs in real time, so keep the tab in front until it finishes.
 
 ## Desktop apps
 
@@ -60,6 +61,8 @@ Desktop builds are on the [Releases](https://github.com/ryder-flyder/utaviewer/r
 
 Video from the desktop apps is MP4 when the app can record it directly, and is otherwise converted to MP4 after recording.
 
+**Firefox:** everything works, but Firefox can't render frame by frame yet, so it records live and a slower computer can drop frames. Chrome, Edge or the desktop apps are best for exporting.
+
 To run the web version yourself, open `index.html` or serve the folder with any static server.
 
 ## AI-assisted code
@@ -68,7 +71,8 @@ UtaViewer contains AI-assisted code. The idea, design, direction and testing are
 
 ## Credits
 
-Uses [js-yaml](https://github.com/nodeca/js-yaml) and [JSZip](https://stuk.github.io/jszip/), both MIT licensed and included in `vendor/`. `vendor/ffmpeg` holds ffmpeg.wasm (@ffmpeg/ffmpeg 0.12.15 and @ffmpeg/core 0.12.10, the core under GPL-2.0-or-later, from https://github.com/ffmpegwasm/ffmpeg.wasm). It is only loaded when you convert a video to MP4.
+Uses [js-yaml](https://github.com/nodeca/js-yaml) and [JSZip](https://stuk.github.io/jszip/), both MIT licensed and included in `vendor/`. `vendor/webcodecs` holds mp4-muxer and webm-muxer by Vanilagy (MIT), used to build the video file for exact frame rendering. `vendor/ffmpeg` holds ffmpeg.wasm (@ffmpeg/ffmpeg 0.12.15 and @ffmpeg/core 0.12.10, the core under GPL-2.0-or-later, from https://github.com/ffmpegwasm/ffmpeg.wasm). It is only loaded when you convert a video to MP4. The wasm is compressed and stored as two text files of about 7 MB each, so every file stays far below GitHub's 25 MB limit and the converter also works when `index.html` is opened straight from disk. Keep all five files in `vendor/ffmpeg`.
 
 UtaViewer is MIT licensed.
+
 

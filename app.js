@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const $ = (s, r = document) => r.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function h(tag, props, ...kids) {
@@ -34,7 +34,7 @@ const PRESETS = {
   'VoiSona': { g: 'Editors', bg1: '#0d0e13', bg2: '#0b0c10', grid: '#c8c8d4', rowW: '#000000', rowWA: 0, rowB: '#000000', rowBA: 0.35, rows: ['#c98a8a', '#14151b', '#6fa06f', '#14151b', '#5a8fb0', '#9a7ac0', '#14151b', '#b06a8a', '#14151b', '#7a6ac0', '#14151b', '#6a9a9a'], rowTintA: 0.34, keyW: '#fafafa', keyB: '#101114', fg: '#f2f2f6', play: '#f7931e', hi: '#fff0d0', act: '#ffffff', pitch: '#ffe0a8', edge: '', palette: ['#ff9a1f', '#4ad0c0', '#7aa2ff', '#ff7aa8', '#b69cff', '#9be07a'], fx: { glow: 0, sparks: false, round: 6, noteH: 94, outline: 0, pitchMode: 'always', pitchW: 1.8, dim: 35 } },
   'OpenUtau': { g: 'Editors', bg1: '#ffffff', bg2: '#f7f7f9', grid: '#8d8d9a', rowW: '#fbfbfc', rowWA: 1, rowB: '#ececf0', rowBA: 1, keyW: '#ffffff', keyB: '#ff4f8b', fg: '#2a2a33', play: '#6c6c7a', hi: '#d6ecff', act: '#0f5fa8', pitch: '#ff3d7f', edge: '', palette: ['#4da3e8', '#ff6aa0', '#5cc48a', '#f2a93b', '#9b7be0', '#35b9c9'], fx: { glow: 0, sparks: false, round: 6, noteH: 88, outline: 0, pitchMode: 'always', pitchW: 1.6, dim: 25 } },
 };
-const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQ: 'VOCALOID 4', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default' };
+const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQ: 'VOCALOID 4', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default', NEUTRINO: 'Default', MusicXML: 'Default' };
 // colour helpers: themes are built in HSL so the light versions stay vivid instead of turning muddy
 const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
 const hslOf = x => {
@@ -175,6 +175,13 @@ const TIPS = {
   wfScopeW: 'Thickness of the scope line.',
   wfScopeY: 'Where the scope line sits, from top to bottom.',
   wfBarN: 'How many bars the spectrum has.',
+  lsOn: 'Swap each track’s picture for the mouth image that matches the vowel being sung.',
+  lsSize: 'How tall the lip sync picture is, as a share of the view.',
+  lsPos: 'Where the picture sits. With several characters they share the width.',
+  lsOpacity: 'How solid the picture is.',
+  lsHold: 'Mouths stay on the last vowel for a moment so quick notes do not flicker.',
+  lsFade: 'Fade from one image to the next. 0 switches instantly.',
+  lsPop: 'The picture swells slightly when each note starts, and settles back.',
   utauClean: 'UST and USTX lyrics often hold more than the syllable: VCV parts like "a ka", CVVC parts like "a k", breaths and arrows. When this is on, only the sung syllable is shown on the notes and in the lyric box. Other file types are not affected.',
   pvQ: 'How sharp the preview is. Lower is smoother on slower computers. Videos are always recorded at the full video size.',
   pvFps: 'Draw the preview 30 times a second instead of matching the screen. Recorded video is not affected.',
@@ -217,7 +224,8 @@ const STATIC_TIPS = [
   ['.tabs [data-tab=proj]', 'Files, tracks, portraits, background, lyric box and the settings you reach for most. Key: 1'],
   ['.tabs [data-tab=fx]', 'Every effect and text option. Key: 2'],
   ['.tabs [data-tab=look]', 'Themes, colors, theme files and the video frame. Key: 3'],
-  ['.tabs [data-tab=exp]', 'Record a video or render a queue of songs. Key: 4'],
+  ['.tabs [data-tab=ls]', 'Mouth images that follow the vowel being sung. Key: 4'],
+  ['.tabs [data-tab=exp]', 'Record a video or render a queue of songs. Key: 5'],
   ['#tlBody', 'Click to move the playhead. Drag the audio lane to slide the audio (it snaps to beats and notes; hold Alt to move freely). Shift-drag sets a loop.'],
   ['#toStart', 'Back to the start. Key: Home'],
   ['#play', 'Play or pause. Key: Space'],
@@ -247,6 +255,11 @@ const STATIC_TIPS = [
   ['#expTo', 'End the recording here instead of at the end.'],
   ['#fps', 'Frames per second of the recording.'],
   ['#mbps', 'Higher quality makes a bigger file.'],
+  ['#method', 'Exact frames draws and saves every frame itself, so the video has exactly the frame rate you chose even on a slow computer. Live recording captures the screen as it plays and can drop frames.'],
+  ['#autoMp4', 'After recording, convert WebM to MP4 or write the length into the file, inside the page. Slower on long videos.'],
+  ['#rngAll', 'Clear both boxes so the whole project is recorded.'],
+  ['#resMp4', 'Convert this recording to an H.264 MP4 that plays everywhere. Runs on your computer.'],
+  ['#resFix', 'Rewrite the file so players show its length and can skip through it. No re-encoding, so it is quick.'],
   ['#rec', 'Plays the project once in real time and records it. Keep this tab open until it finishes.'],
   ['label[for=qCaption]', 'Put each file’s name in the top left of its video.'],
   ['#qAdd', 'Add project files, and audio files with the same names, to render in one go.'],
@@ -316,6 +329,13 @@ const FXDEF = [
   { k: 'lbPanelA', t: 'range', l: 'Panel opacity', min: 0, max: 100, step: 1, u: '%' },
   { k: 'lbRadius', t: 'range', l: 'Corner rounding', min: 0, max: 40, step: 1, u: ' px' },
   { k: 'lbPad', t: 'range', l: 'Padding', min: 40, max: 220, step: 5, u: '%' },
+  { ls: true, k: 'lsOn', t: 'toggle', l: 'Lip sync on' },
+  { ls: true, k: 'lsSize', t: 'range', l: 'Size', min: 30, max: 150, step: 1, u: '%' },
+  { ls: true, k: 'lsPos', t: 'select', l: 'Position', opts: [['l', 'Left'], ['c', 'Center'], ['r', 'Right']] },
+  { ls: true, k: 'lsOpacity', t: 'range', l: 'Opacity', min: 10, max: 100, step: 1, u: '%' },
+  { ls: true, k: 'lsHold', t: 'range', l: 'Keep the mouth open after a note ends', min: 0, max: 300, step: 10, u: ' ms' },
+  { ls: true, k: 'lsFade', t: 'range', l: 'Blend between images', min: 0, max: 150, step: 5, u: ' ms' },
+  { ls: true, k: 'lsPop', t: 'range', l: 'Small pop on every note', min: 0, max: 20, step: 1, u: '%' },
   { sec: 'Preview speed' },
   { k: 'pvQ', t: 'select', l: 'Preview quality', opts: [['auto', 'Automatic (match the screen, step down if slow)'], ['1', 'Full (same as the video size)'], ['0.75', '75%'], ['0.5', '50%'], ['0.33', '33%']] },
   { k: 'pvFps', t: 'select', l: 'Preview frame rate', opts: [['max', 'As fast as the screen'], ['30', '30 fps (lighter)']] },
@@ -367,9 +387,9 @@ const FXDEF = [
   { k: 'keys', t: 'toggle', l: 'Piano keys' },
   { k: 'grid', t: 'toggle', l: 'Grid lines' }
 ];
-const FX0 = { wfStyle: 'off', wfW: 100, wfH: 100, wfPX: 50, wfPY: 50, wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, lineGap: 0.35, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off', lyFont: 'sans', lyWeight: 'auto', lyItalic: false, lyCase: 'asis', lySpacing: 0, lyColor: 'auto', lyColorC: '#ffffff', lyOut: 0, lyShadow: false, lyrRoll: false, lbFont: 'sans', lbWeight: '650', lbItalic: false, lbCase: 'asis', lbSpacing: 0, lbAlign: 'left', lbLine: 130, lbSec: 62, lbColor: 'theme', lbColorC: '#ffffff', lbLit: 'theme', lbLitC: '#ffd54a', lbOut: 0, lbShadow: false, lbPanel: 'theme', lbPanelC: '#000000', lbPanelA: 80, lbRadius: 14, lbPad: 100, lbKStyle: 'switch', lbUnsung: 62, pvQ: 'auto', pvFps: 'max', pvLite: false, utauClean: true };
+const FX0 = { wfStyle: 'off', wfW: 100, wfH: 100, wfPX: 50, wfPY: 50, wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, lineGap: 0.35, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off', lyFont: 'sans', lyWeight: 'auto', lyItalic: false, lyCase: 'asis', lySpacing: 0, lyColor: 'auto', lyColorC: '#ffffff', lyOut: 0, lyShadow: false, lyrRoll: false, lbFont: 'sans', lbWeight: '650', lbItalic: false, lbCase: 'asis', lbSpacing: 0, lbAlign: 'left', lbLine: 130, lbSec: 62, lbColor: 'theme', lbColorC: '#ffffff', lbLit: 'theme', lbLitC: '#ffd54a', lbOut: 0, lbShadow: false, lbPanel: 'theme', lbPanelC: '#000000', lbPanelA: 80, lbRadius: 14, lbPad: 100, lbKStyle: 'switch', lbUnsung: 62, pvQ: 'auto', pvFps: 'max', pvLite: false, utauClean: true, lsOn: false, lsSize: 90, lsPos: 'r', lsOpacity: 100, lsHold: 60, lsFade: 0, lsPop: 0 };
 const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'lineGap', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
-const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', lyricText: '', lyricText2: '', lyrTrack: 'auto', bgMode: 'normal', shade: 'dark', tc: {}, themes: {} };
+const LOOK0 = { preset: 'Default', auto: true, colors: {}, palette: null, mine: null, caption: '', size: '1920x1080', fps: '60', mbps: '16', autoMp4: true, method: 'exact', lyricText: '', lyricText2: '', lyrTrack: 'auto', bgMode: 'normal', shade: 'dark', tc: {}, themes: {} };
 let fx = { ...FX0 }, look = { ...LOOK0 };
 try { const s = JSON.parse(localStorage.getItem('utaviewer.v2') || 'null'); if (s) { Object.assign(fx, s.fx || {}); Object.assign(look, s.look || {}); if (look.size === '1280x720' && look.fps === '30' && look.mbps === '8') Object.assign(look, { size: LOOK0.size, fps: LOOK0.fps, mbps: LOOK0.mbps }); } } catch (e) {}
 if (look.mine) PRESETS['My theme'] = look.mine; else PRESETS['My theme'] = Object.assign({}, PRESETS.Default, { g: 'Yours', fx: {} });
@@ -422,7 +442,7 @@ const save = () => { if (!saveT) saveT = setTimeout(saveNow, 350); };
 addEventListener('pagehide', () => { if (saveT) { clearTimeout(saveT); saveNow(); } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && saveT) { clearTimeout(saveT); saveNow(); } });
 
-const S = { files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], lines2: [], linesDirty: true, loop: { a: null, b: null, on: false }, queue: [] };
+const S = { ls: new Map(), files: [], time: 0, duration: 10, playing: false, range: { lo: 57, hi: 79 }, tm: null, ctx: null, master: null, dest: null, buf: null, bufName: '', src: null, shift: 0, c0: 0, t0: 0, prevT: 0, parts: [], nextId: 1, ci: 0, exporting: null, scrub: false, dl: null, last: 0, ports: new Map(), bg: null, lines: [], lines2: [], linesDirty: true, loop: { a: null, b: null, on: false }, queue: [] };
 const cv = $('#cv'), ctx = cv.getContext('2d');
 
 // status
@@ -447,6 +467,7 @@ function recalc() {
   if (S.buf) d = Math.max(d, S.buf.duration - S.shift);
   S.duration = Math.max(3, d);
   S.time = clamp(S.time, 0, S.duration);
+  if (typeof syncRange === 'function') syncRange();
   const real = S.files[0];
   S.tm = real ? real.tm : null;
   let lo = 127, hi = 0;
@@ -467,11 +488,11 @@ function addProject(res, name) {
   S.files.push(f); applyUtauMode();
 }
 // extension wins over the browser's guess: Chrome reports .mid as audio/mid
-const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsq', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln'];
+const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsq', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln', 'zip', 'ntpj', 'xml', 'musicxml', 'mxl'];
 async function addFiles(list) {
   const files = Array.from(list), audio = [], proj = [];
   for (const f of files) { const e = f.name.split('.').pop().toLowerCase(); (PROJ_EXT.includes(e) ? proj : (['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(e) || f.type.startsWith('audio/') ? audio : proj)).push(f); }
-  const errs = []; let added = 0, styled = '';
+  const errs = []; let added = 0, styled = '', vocalsMsg = '';
   for (const f of proj) {
     try {
       const r = await parseProjectFile(f, fx.bend);
@@ -480,13 +501,14 @@ async function addFiles(list) {
       const keep = r.fmt === 'UST' ? S.files.filter(x => x.fmt === 'UST') : [];
       if (keep.length !== S.files.length) { S.files = keep; if (!keep.length) S.ci = 0; }
       addProject(r, f.name); added++;
+      if (r.vocals && !S.buf) { vocalsMsg = await loadVocals(r.vocals); }
       if (first && look.auto && FMT_STYLE[r.fmt] && look.preset !== FMT_STYLE[r.fmt]) { applyPreset(FMT_STYLE[r.fmt], true); styled = FMT_STYLE[r.fmt]; }
     } catch (e) { errs.push(f.name + ': ' + (e && e.message || 'could not be read')); }
   }
   if (audio.length) await loadAudio(audio[0]);
   recalc(); renderProjects();
   if (errs.length) msg(errs.join('  |  '), 'err');
-  else if (added) msg(added + (added === 1 ? ' project' : ' projects') + ' loaded.' + (styled ? ' Style set to ' + styled + ' (change it in Look).' : ''), 'ok');
+  else if (added) msg(added + (added === 1 ? ' project' : ' projects') + ' loaded.' + (styled ? ' Style set to ' + styled + ' (change it in Look).' : '') + vocalsMsg, 'ok');
 }
 
 // audio
@@ -498,6 +520,21 @@ async function ensureCtx() {
     S.master.connect(S.ctx.destination); S.master.connect(S.dest);
   }
   if (S.ctx.state !== 'running') { try { await S.ctx.resume(); } catch (e) {} }
+}
+// a NEUTRINO project that has been rendered carries the sound of every phrase; lay them end to end as the project's audio
+async function loadVocals(list) {
+  try {
+    await ensureCtx(); const sr = S.ctx.sampleRate, parts = [];
+    for (const v of list) { try { parts.push({ t0: v.t0, ab: await S.ctx.decodeAudioData(v.data.slice(0)) }); } catch (e) {} }
+    if (!parts.length) return '';
+    const end = Math.max(...parts.map(p => p.t0 + p.ab.duration)), out = S.ctx.createBuffer(1, Math.ceil(end * sr) + 1, sr), ch = out.getChannelData(0);
+    for (const p of parts) {
+      const o = Math.round(p.t0 * sr), n = p.ab.numberOfChannels;
+      for (let c = 0; c < n; c++) { const d = p.ab.getChannelData(c); for (let i = 0; i < d.length && o + i < ch.length; i++) ch[o + i] += d[i] / n; }
+    }
+    S.buf = out; S.bufName = 'Rendered vocals'; S.shift = 0; renderAudio();
+    return ' The rendered vocals were added as audio.';
+  } catch (e) { return ''; }
 }
 async function loadAudio(file) {
   try {
@@ -556,7 +593,7 @@ window.addEventListener('keydown', e => {
   else if (k === 'r' || k === 'R') toggleLoop();
   else if (k === 'Escape') clearLoop();
   else if (k === '?' || k === '/') { $('#help').showModal(); }
-  else if (/^[1-4]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
+  else if (/^[1-5]$/.test(k)) { const b = document.querySelectorAll('.tabs button')[+k - 1]; if (b) b.click(); }
 });
 function nudgeWindow(dir) { fx.window = clamp(Math.round(fx.window * (dir > 0 ? 1.25 : 0.8) * 2) / 2, 2, 24); syncControl('window'); save(); msg('Time window ' + fx.window + ' s'); }
 $('#btnHelp').addEventListener('click', () => $('#help').showModal());
@@ -706,7 +743,7 @@ function draw(T) {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     drawBg(W, H, P);
   }
-  const tm = S.tm, bph = tm ? (((tm.s2t(T) / tm.res) % 1) + 1) % 1 : 0, pulse = fx.pulse && S.playing ? Math.exp(-bph * 6) : 0;
+  const tm = S.tm, bph = tm ? (((tm.s2t(T) / tm.res) % 1) + 1) % 1 : 0, pulse = fx.pulse && (S.playing || S.rendering) ? Math.exp(-bph * 6) : 0;
 
   ctx.save(); ctx.beginPath(); ctx.rect(keysW, 0, W - keysW, H); ctx.clip();
   if (fx.rows && bgm === 'normal') {
@@ -740,6 +777,7 @@ function draw(T) {
   }
 
   drawPortraits(W, H, keysW, P);
+  drawLipsync(W, H, keysW, P, T);
   drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, false);
   const act = [], jobs = [], lineJobs = [], gl = glowPx(sc), nh = rowH * fx.noteH / 100, rad = nh * fx.round / 100;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -830,7 +868,7 @@ function draw(T) {
 
 function stepParticles(dt) {
   const sc = S.sc || 1;
-  if (fx.sparks && S.playing && S.act) {
+  if (fx.sparks && (S.playing || S.rendering) && S.act) {
     for (const a of S.act) {
       a.t._acc = (a.t._acc || 0) + dt * 70;
       while (a.t._acc >= 1) {
@@ -841,7 +879,7 @@ function stepParticles(dt) {
     }
     if (S.parts.length > 700) S.parts.splice(0, S.parts.length - 700);
   }
-  if (S.playing || S.parts.length) for (const p of S.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * sc * dt; p.vx *= 0.985; }
+  if (S.playing || S.rendering || S.parts.length) for (const p of S.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * sc * dt; p.vx *= 0.985; }
   S.parts = S.parts.filter(p => p.life > 0);
   if (!fx.sparks && S.parts.length) S.parts.length = 0;
 }
@@ -988,6 +1026,7 @@ function adaptQuality(dt) {
   else if (S.iv < want * 1.08 && S.adapt < 1 && !S.noUp && now - (S.adT || 0) > 9000) { S.adapt = Math.min(1, +(S.adapt + 0.15).toFixed(2)); S.adT = now; S.qDirty = true; S.ivN = 0; S.upTried = true; }
 }
 function loop(ts) {
+  if (S.rendering) { requestAnimationFrame(loop); return; }
   const busy = S.playing || S.exporting || S.parts.length || ts - (S.wake || 0) < 1500;
   if (!busy && ts - (S.last || 0) < 200) { warmLines(); setTimeout(() => requestAnimationFrame(loop), 50); return; }
   if (!S.exporting && S.playing && fx.pvFps === '30' && ts - (S.last || 0) < 29) { requestAnimationFrame(loop); return; }
@@ -1006,7 +1045,7 @@ function loop(ts) {
   }
   stepParticles(dt); S.dt = dt;
   draw(S.time);
-  if (ts - (S.loT || 0) > 250) { S.loT = ts; markLoRow(); }
+  if (ts - (S.loT || 0) > 250) { S.loT = ts; markLoRow(); markLsNow(); }
   const tx = fmt(S.time); if (tx !== lastTxt) { $('#tNow').textContent = tx; lastTxt = tx; }
   updateTL(); { const ti = S.files.map(f => f.name).join(', ') + bpmText(); if (ti !== lastInfo) { lastInfo = ti; $('#tcInfo').textContent = ti; } }
   if (S.exporting) { const x = S.exporting, k = clamp((S.time - x.from) / Math.max(0.1, x.to - x.from), 0, 1); $('#recBar').style.width = (k * 100).toFixed(1) + '%'; $('#recText').textContent = 'Recording ' + Math.round(k * 100) + '%  (' + fmt(S.time - x.from) + ' of ' + fmt(x.to - x.from) + ')'; }
@@ -1083,6 +1122,7 @@ function makeCtl(d, pre) {
 function buildFx() {
   const pane = $('#fxPane'); let box = pane, first = true;
   for (const d of FXDEF) {
+    if (d.ls) continue;
     if (d.sec) {
       const body = h('div', { class: 'acbody' }), det = h('details', { class: 'ac' }, h('summary', null, d.sec), body);
       if (first) { det.open = true; first = false; }
@@ -1183,6 +1223,14 @@ if (window.ResizeObserver) new ResizeObserver(() => { S.qDirty = true; S.wake = 
 $('#size').value = look.size; $('#size').addEventListener('change', e => { look.size = e.target.value; setSize(); save(); });
 $('#caption').value = look.caption; $('#caption').addEventListener('input', e => { look.caption = e.target.value; save(); });
 $('#fps').value = look.fps; $('#fps').addEventListener('change', e => { look.fps = e.target.value; save(); });
+function syncMethod() {
+  const ok = exactSupported() && look.bgMode !== 'alpha', exact = look.method !== 'live' && ok;
+  $('#method').value = ok ? look.method : 'live'; $('#method').disabled = !ok; $('#rec').textContent = exact ? 'Render video' : 'Record video';
+  $('#methodHint').textContent = exact ? 'Draws every frame at its own moment, so the frame rate is exactly what you set whatever the speed of this computer. It can take longer than the song, and it keeps going if this tab is in the background.'
+    : (look.bgMode === 'alpha' ? 'Transparent video uses live recording. ' : !exactSupported() ? 'This browser cannot render frame by frame (use Chrome, Edge or the Windows app for that), so it records live. ' : '') + 'Recording plays the whole project once in real time and captures the canvas plus any loaded audio. Keep this tab in the foreground until it finishes. A slow computer can drop frames.';
+}
+$('#method').addEventListener('change', e => { look.method = e.target.value; save(); syncMethod(); });
+syncMethod();
 $('#mbps').value = look.mbps; $('#mbps').addEventListener('change', e => { look.mbps = e.target.value; save(); });
 
 // tabs
@@ -1254,52 +1302,293 @@ const scr = $('#screen');
 ['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => { if (ev === 'drop') { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); } scr.classList.remove('over'); }));
 
 // export
-function pickMime() {
-  if (look.bgMode === 'alpha') { const w = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']; return w.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ''; }
-  const c = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
-  return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+// export range: an empty From means the start, an empty To means the end of the project
+function exportRange(whole) {
+  const fr = parseFloat($('#expFrom').value), tr = parseFloat($('#expTo').value);
+  const from = whole || !isFinite(fr) ? 0 : clamp(fr, 0, S.duration);
+  const to = whole || !isFinite(tr) ? S.duration : clamp(tr, 0, S.duration);
+  const err = to - from < 0.5 ? (to <= from ? 'The end (' + fmt(to) + ') is before the start (' + fmt(from) + '). Change the To box or press Whole project.' : 'The range has to be at least half a second long.') : '';
+  return { from, to, err };
+}
+function syncRange() {
+  const to = $('#expTo'); if (!to) return;
+  to.placeholder = S.duration.toFixed(1); to.max = S.duration.toFixed(1); $('#expFrom').max = S.duration.toFixed(1);
+  const r = exportRange(false);
+  $('#rngInfo').textContent = r.err ? r.err : 'Records ' + fmt(r.from) + ' to ' + fmt(r.to) + ' (' + fmt(r.to - r.from) + ' long).';
+  $('#rngInfo').classList.toggle('err', !!r.err);
+}
+function pickMime(noMp4) {
+  const ok = m => window.MediaRecorder && MediaRecorder.isTypeSupported(m);
+  if (look.bgMode === 'alpha') { return ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(ok) || ''; }
+  // H.264 needs a level that fits the picture size and frame rate, or some encoders (Windows especially) start and then write nothing
+  const [w, h] = look.size.split('x').map(Number), mbs = Math.ceil(w / 16) * Math.ceil(h / 16) * (parseInt(look.fps, 10) || 30);
+  const lv = mbs <= 245760 ? '28' : mbs <= 522240 ? '2A' : mbs <= 983040 ? '33' : '34';
+  const mp4 = noMp4 ? [] : ['video/mp4;codecs=avc1.6400' + lv + ',mp4a.40.2', 'video/mp4;codecs=avc1.4D40' + lv + ',mp4a.40.2', 'video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
+  const c = mp4.concat(['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']);
+  // Chromium without an H.264 encoder takes plain video/mp4 but writes VP9 into it, so skip that type there
+  const chromium = /Chrome\//.test(navigator.userAgent);
+  return c.find(m => ok(m) && !(chromium && m === 'video/mp4')) || '';
 }
 async function startExport(opts) {
+  if (look.method !== 'live' && look.bgMode !== 'alpha' && !(opts && opts.noExact) && exactSupported()) {
+    const r = await renderExact(opts);
+    if (r !== undefined) return r;
+  }
+  if (S.converting) { msg('Wait for the conversion to finish first.', 'err'); return null; }
   if (S.exporting) return null;
   if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record the canvas. Try a current Chrome, Edge or Safari.', 'err'); return null; }
-  const mime = pickMime(); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return null; }
+  const mime = pickMime(opts && opts.noMp4); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return null; }
   const whole = !!(opts && opts.whole);
-  const from = whole ? 0 : clamp(parseFloat($('#expFrom').value) || 0, 0, S.duration);
-  const toRaw = parseFloat($('#expTo').value), to = whole || !isFinite(toRaw) ? S.duration : clamp(toRaw, 0, S.duration);
-  if (to - from < 0.5) { msg('The end of the range has to be at least half a second after the start.', 'err'); return null; }
+  const rg = exportRange(whole);
+  if (rg.err) { msg(rg.err, 'err'); return null; }
+  const from = rg.from, to = rg.to;
   pause(); await ensureCtx(); S.parts.length = 0;
   S.fullRes = true; applyRes();
   const stream = cv.captureStream(parseInt(look.fps, 10));
   S.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  // keeps the recorder's audio input alive when nothing is playing, otherwise the file can come out empty
+  let keep = null; try { keep = S.ctx.createConstantSource(); keep.offset.value = 1e-5; keep.connect(S.dest); keep.start(); } catch (e) { keep = null; }
   let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: parseFloat(look.mbps) * 1e6, audioBitsPerSecond: 192000 }); } catch (e) { msg('Recording could not start: ' + e.message, 'err'); S.fullRes = false; S.qDirty = true; return null; }
   const chunks = [], type = mime.split(';')[0];
   let done; const finished = new Promise(r => { done = r; });
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-  rec.onstop = () => {
-    const ex = S.exporting; S.exporting = null; S.fullRes = false; S.qDirty = true; $('#recState').hidden = true; $('#rec').disabled = false;
-    const res = ex && !ex.cancel ? { blob: new Blob(chunks, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' } : null;
-    if (res) showResult(res.blob, res.ext);
+  rec.onerror = () => { try { if (rec.state !== 'inactive') rec.stop(); } catch (e) {} };
+  rec.onstop = async () => {
+    const ex = S.exporting, early = ex && !ex.cancel && !ex.ended;
+    S.exporting = null; S.fullRes = false; S.qDirty = true; $('#recState').hidden = true;
+    if (keep) { try { keep.stop(); keep.disconnect(); } catch (e) {} }
+    const blob = new Blob(chunks, { type });
+    if (early) pause();
+    if (ex && !ex.cancel && blob.size < 2048) {
+      // the recorder produced nothing (it failed to start, or stopped by itself)
+      $('#rec').disabled = false;
+      if (type.includes('mp4') && !(opts && opts.noMp4)) { msg('MP4 recording did not work on this computer, trying WebM instead...'); done(await startExport({ ...(opts || {}), noMp4: true })); return; }
+      msg('The recording came out empty. Try a smaller video size or a lower frame rate in the Export tab.', 'err'); done(null); return;
+    }
+    let res = ex && !ex.cancel ? { blob, ext: type.includes('mp4') ? 'mp4' : 'webm', len: to - from } : null;
+    if (res) {
+      showResult(res.blob, res.ext, res.len);
+      if (look.autoMp4 && res.blob.size > 250e6) msg('The recording is large, so it was not repaired automatically. Press Fix length to do it.', 'ok');
+      else if (look.autoMp4) {
+        const kind = res.ext === 'webm' && look.bgMode !== 'alpha' ? 'mp4' : 'fix';
+        try { const m = await ffConvert(res.blob, kind, res.len); res = { blob: m, ext: kind === 'mp4' ? 'mp4' : res.ext, len: res.len }; showResult(m, res.ext, res.len, true); }
+        catch (e) { if (e && e.cancelled) msg('Cancelled. The original recording is still here.'); else msg('That did not work (' + (e && e.message || 'error') + '). The original recording is still here.', 'err'); }
+      }
+    }
+    $('#rec').disabled = false;
     done(res);
   };
   S.exporting = { rec, cancel: false, from, to }; $('#rec').disabled = true; $('#recState').hidden = false; $('#result').hidden = true;
   seek(from); rec.start(250); await play(); msg('');
   return finished;
 }
-function finishExport() { const ex = S.exporting; if (ex) setTimeout(() => { try { ex.rec.stop(); } catch (e) {} }, 400); }
+// ---- exact render: each frame is drawn at its own moment and encoded with WebCodecs, so the frame rate is what the project says on any computer
+function exactSupported() { return !!(window.VideoEncoder && window.AudioEncoder && window.VideoFrame && window.AudioData && window.MessageChannel); }
+let exactLibs = null;
+async function exactReady() {
+  if (!exactLibs) exactLibs = (async () => { if (!window.Mp4Muxer) await loadScript('vendor/webcodecs/mp4-muxer.js'); if (!window.WebMMuxer) await loadScript('vendor/webcodecs/webm-muxer.js'); })();
+  try { await exactLibs; return true; } catch (e) { exactLibs = null; return false; }
+}
+async function exactPlan(w, h, fps, bps, sr, nch) {
+  const mbs = Math.ceil(w / 16) * Math.ceil(h / 16) * fps, luma = w * h * fps;
+  const al = mbs <= 245760 ? '28' : mbs <= 522240 ? '2A' : mbs <= 983040 ? '33' : '34';
+  const vl = luma <= 36864000 ? '31' : luma <= 83558400 ? '40' : luma <= 160432128 ? '41' : luma <= 311951360 ? '50' : '51';
+  const base = { width: w, height: h, bitrate: bps, framerate: fps, latencyMode: 'quality' };
+  const vids = [
+    { cfg: { ...base, codec: 'avc1.6400' + al, avc: { format: 'avc' } }, box: 'mp4', mux: 'avc' },
+    { cfg: { ...base, codec: 'avc1.4D40' + al, avc: { format: 'avc' } }, box: 'mp4', mux: 'avc' },
+    { cfg: { ...base, codec: 'vp09.00.' + vl + '.08' }, box: 'webm', mux: 'V_VP9' },
+    { cfg: { ...base, codec: 'vp8' }, box: 'webm', mux: 'V_VP8' }
+  ];
+  for (const v of vids) {
+    try { if (!(await VideoEncoder.isConfigSupported(v.cfg)).supported) continue; } catch (e) { continue; }
+    let audio = null;
+    if (nch) {
+      const cands = v.box === 'mp4' ? [{ codec: 'mp4a.40.2', mux: 'aac' }, { codec: 'opus', mux: 'opus' }] : [{ codec: 'opus', mux: 'A_OPUS' }];
+      for (const c of cands) { const cfg = { codec: c.codec, sampleRate: sr, numberOfChannels: nch, bitrate: 192000 }; try { if ((await AudioEncoder.isConfigSupported(cfg)).supported) { audio = { cfg, mux: c.mux }; break; } } catch (e) {} }
+      if (!audio) continue;
+    }
+    return { ...v, audio };
+  }
+  return null;
+}
+const yieldUI = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
+function bgSeek(T) {
+  const b = S.bg; if (!b || b.kind !== 'video' || !b.el.duration) return Promise.resolve();
+  return new Promise(res => { const v = b.el, t = T % v.duration; if (Math.abs(v.currentTime - t) < 0.001) return res(); const done = () => { v.removeEventListener('seeked', done); res(); }; v.addEventListener('seeked', done); try { v.currentTime = t; } catch (e) { done(); } setTimeout(done, 400); });
+}
+// resolves with { blob, ext, len }, null when cancelled or failed, and undefined when the live recorder should be used instead
+async function renderExact(opts) {
+  if (S.converting) { msg('Wait for the conversion to finish first.', 'err'); return null; }
+  if (S.exporting) return null;
+  const rg = exportRange(!!(opts && opts.whole)); if (rg.err) { msg(rg.err, 'err'); return null; }
+  if (!(await exactReady())) return undefined;
+  pause(); await ensureCtx();
+  const fps = parseInt(look.fps, 10) || 30, from = rg.from, to = rg.to, total = Math.max(1, Math.round((to - from) * fps));
+  S.fullRes = true; applyRes(); const W = cv.width, H = cv.height;
+  const buf = S.buf, sr = buf ? buf.sampleRate : 0, nch = buf ? Math.min(2, buf.numberOfChannels) : 0;
+  const plan = await exactPlan(W, H, fps, parseFloat(look.mbps) * 1e6, sr, nch);
+  if (!plan) { S.fullRes = false; S.qDirty = true; return undefined; }
+  const M = plan.box === 'mp4' ? Mp4Muxer : WebMMuxer;
+  let muxer, venc, aenc, err = null;
+  try {
+    muxer = new M.Muxer({ target: new M.ArrayBufferTarget(), video: { codec: plan.mux, width: W, height: H, frameRate: fps },
+      ...(plan.audio ? { audio: { codec: plan.audio.mux, numberOfChannels: nch, sampleRate: sr } } : {}),
+      ...(plan.box === 'mp4' ? { fastStart: 'in-memory' } : {}), firstTimestampBehavior: 'offset' });
+    venc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => { err = err || e; } }); venc.configure(plan.cfg);
+    if (plan.audio) { aenc = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => { err = err || e; } }); aenc.configure(plan.audio.cfg); }
+  } catch (e) { S.fullRes = false; S.qDirty = true; return undefined; }
+  const ex = S.exporting = { cancel: false, from, to, exact: true }; S.rendering = true;
+  $('#rec').disabled = true; $('#recState').hidden = false; $('#result').hidden = true; S.parts.length = 0;
+  const t0 = performance.now(); let n = 0, last = t0;
+  try {
+    // audio first: the project's audio over the chosen range, cut into one second pieces
+    if (aenc) {
+      const per = sr, nA = Math.round((to - from) * sr), off0 = Math.round((from + S.shift) * sr), chd = [buf.getChannelData(0), buf.getChannelData(Math.min(1, nch - 1))];
+      for (let i = 0; i < nA && !ex.cancel; i += per) {
+        const len = Math.min(per, nA - i), data = new Float32Array(len * nch);
+        for (let c = 0; c < nch; c++) { const src = chd[c], dst = data.subarray(c * len, (c + 1) * len); for (let k = 0; k < len; k++) { const j = off0 + i + k; dst[k] = j >= 0 && j < src.length ? src[j] : 0; } }
+        const ad = new AudioData({ format: 'f32-planar', sampleRate: sr, numberOfFrames: len, numberOfChannels: nch, timestamp: Math.round(i / sr * 1e6), data });
+        aenc.encode(ad); ad.close();
+        if (err) throw err; if (aenc.encodeQueueSize > 20) await yieldUI();
+      }
+    }
+    S.time = from; S.dt = 1 / fps; S.act = null;
+    for (; n < total && !ex.cancel; n++) {
+      const T = Math.min(to, from + n / fps); S.time = T; S.prevT = T;
+      await bgSeek(T);
+      stepParticles(1 / fps); S.dt = 1 / fps; draw(T);
+      const vf = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      venc.encode(vf, { keyFrame: n % (fps * 2) === 0 }); vf.close();
+      if (err) throw err;
+      const now = performance.now();
+      if (now - last > 120 || venc.encodeQueueSize > 6) {
+        last = now;
+        const k = n / total, sp = n / ((now - t0) / 1000), eta = (total - n) / Math.max(0.1, sp);
+        $('#recBar').style.width = (k * 100).toFixed(1) + '%';
+        $('#recText').textContent = 'Rendering frame ' + n + ' of ' + total + '  (' + sp.toFixed(1) + ' frames/s, about ' + (eta < 90 ? Math.ceil(eta) + ' s' : Math.ceil(eta / 60) + ' min') + ' left)';
+        while (venc.encodeQueueSize > 12 && !ex.cancel) await new Promise(r => setTimeout(r, 4));
+        await yieldUI();
+      }
+    }
+    if (!ex.cancel) { $('#recText').textContent = 'Finishing the file...'; await venc.flush(); if (aenc) await aenc.flush(); if (err) throw err; muxer.finalize(); }
+  } catch (e) {
+    err = e; ex.cancel = true;
+  }
+  try { venc.close(); } catch (e) {} try { aenc && aenc.close(); } catch (e) {}
+  const cancelled = ex.cancel && !err;
+  S.exporting = null; S.rendering = false; S.fullRes = false; S.qDirty = true; $('#recState').hidden = true; $('#rec').disabled = false; seek(from);
+  if (cancelled) { msg('Rendering cancelled.'); return null; }
+  if (err) { msg('Rendering failed (' + (err.message || err) + '). Switching to live recording.', 'err'); return undefined; }
+  const ext = plan.box === 'mp4' ? 'mp4' : 'webm', blob = new Blob([muxer.target.buffer], { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
+  showResult(blob, ext, to - from, true);
+  $('#resInfo').textContent += ' Rendered frame by frame at ' + fps + ' fps' + (plan.box === 'webm' ? ' (this browser has no H.264 encoder)' : '') + '.';
+  msg('Rendering finished.', 'ok');
+  let out = { blob, ext, len: to - from };
+  const needFix = ext === 'webm' ? 'mp4' : plan.audio && plan.audio.mux === 'opus' ? 'aac' : '';
+  if (needFix && look.autoMp4) {
+    try { const m = await ffConvert(blob, needFix, out.len); out = { blob: m, ext: 'mp4', len: out.len }; showResult(m, 'mp4', out.len, true); }
+    catch (e) { if (e && e.cancelled) msg('Cancelled. The unconverted render is still here.'); else msg('That did not work (' + (e && e.message || 'error') + '). The unconverted render is still here.', 'err'); }
+  }
+  return out;
+}
+function finishExport() { const ex = S.exporting; if (ex) ex.ended = true; if (ex) setTimeout(() => { try { ex.rec.stop(); } catch (e) {} }, 400); }
 $('#rec').addEventListener('click', () => startExport());
-$('#recCancel').addEventListener('click', () => { const ex = S.exporting; if (!ex) return; S.qstop = true; ex.cancel = true; pause(); try { ex.rec.stop(); } catch (e) {} msg('Recording cancelled.'); });
-let lastBlob = null, lastExt = 'mp4', lastUrl = null;
-function showResult(blob, ext) {
-  lastBlob = blob; lastExt = ext;
+$('#recCancel').addEventListener('click', () => { const ex = S.exporting; if (!ex) return; S.qstop = true; ex.cancel = true; pause(); try { ex.rec && ex.rec.stop(); } catch (e) {} msg('Recording cancelled.'); });
+let lastBlob = null, lastExt = 'mp4', lastUrl = null, lastLen = 0;
+function showResult(blob, ext, len, fixed) {
+  lastBlob = blob; lastExt = ext; lastLen = len || lastLen;
   const base = ((S.files[0] || {}).name || 'utaviewer').replace(/\.[^.]+$/, '');
   $('#result').hidden = false;
-  $('#resInfo').textContent = (blob.size / 1048576).toFixed(1) + ' MB, ' + ext.toUpperCase() + (ext === 'webm' ? '. This browser records WebM only; convert to MP4 with HandBrake or ffmpeg if you need one.' : '.');
+  const alpha = look.bgMode === 'alpha';
+  $('#resInfo').textContent = (blob.size / 1048576).toFixed(1) + ' MB, ' + ext.toUpperCase() + (ext === 'webm' ? (alpha ? '. Transparent video has to stay WebM.' : '. This browser records WebM. Convert to MP4 for editors, phones and social sites.') : '.') + (fixed ? ' Length is stored in the file.' : ' If your player shows no end time, press Fix length.');
+  $('#resConv').hidden = false; $('#resMp4').hidden = ext !== 'webm' || alpha; $('#resFix').hidden = false;
   const v = $('#resVideo'); v.hidden = true;
   if (lastUrl) URL.revokeObjectURL(lastUrl);
   try { lastUrl = URL.createObjectURL(blob); v.onloadedmetadata = () => { v.hidden = false; }; v.src = lastUrl; } catch (e) {}
   $('#resSave').dataset.name = base + '-utaviewer.' + ext; $('#resSave').hidden = false;
-  msg('Recording finished.', 'ok');
+  msg('Video ready.', 'ok');
 }
+
+// ---- MP4 conversion with ffmpeg (WebAssembly). Loaded only when asked for; the files live in vendor/ffmpeg, so nothing is downloaded from other sites.
+const FF = { urls: null };
+const FF_BASE = 'vendor/ffmpeg/';
+function loadScript(src) { return new Promise((res, rej) => { const e = document.createElement('script'); e.src = src; e.onload = res; e.onerror = () => { e.remove(); rej(new Error(src + ' could not be loaded')); }; document.head.append(e); }); }
+function b64bytes(str) { const bin = atob(str), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
+// Everything is loaded with script tags (the files hold their data as text), so it also works when index.html is opened straight from disk, where browsers refuse to read other files.
+const FF_PARTS = ['ffmpeg.js', 'ffmpeg-worker.js', 'ffmpeg-core-js.js', 'ffmpeg-wasm-1.js', 'ffmpeg-wasm-2.js'];
+async function ffEngine(status) {
+  let step = 'start';
+  try {
+    if (!FF.urls) {
+      for (let i = 0; i < FF_PARTS.length; i++) {
+        step = FF_PARTS[i]; status('Loading the converter (one time)...', i / FF_PARTS.length);
+        if (i === 0 ? !window.FFmpegWASM : !window.__uvFF || !(i === 1 ? window.__uvFF.worker : i === 2 ? window.__uvFF.core : window.__uvFF.wasm && window.__uvFF.wasm[i - 3])) await loadScript(FF_BASE + FF_PARTS[i]);
+      }
+      step = 'preparing'; const d = window.__uvFF;
+      // blob URLs can't be imported or fetched by a worker when the page was opened from disk, but data URLs can. The wasm is too big for one, so it travels (gzipped) inside the worker's own text and is handed to fetch().
+      const hook = '";(function(){var b=atob(self.__uvWasm),u=new Uint8Array(b.length),i,w;for(i=0;i<b.length;i++)u[i]=b.charCodeAt(i);self.__uvWasm=null;var f=self.fetch;self.fetch=function(x){if(String(x).indexOf("uvwasm:")!==0)return f.apply(this,arguments);w=w||new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();return w.then(function(a){return new Response(a,{headers:{"Content-Type":"application/wasm"}})})}})();\n';
+      FF.urls = {
+        worker: URL.createObjectURL(new Blob(['self.__uvWasm="', d.wasm[0], d.wasm[1], hook, d.worker], { type: 'text/javascript' })),
+        core: 'data:text/javascript;charset=utf-8,' + encodeURIComponent(d.core),
+        wasm: 'uvwasm:core'
+      };
+      delete window.__uvFF;
+    }
+    step = 'starting'; status('Starting the converter...', 1);
+    const ff = new FFmpegWASM.FFmpeg(), RealWorker = window.Worker;
+    // ffmpeg builds its worker from a file path, which fails from disk, so hand it the worker text as a blob instead
+    window.Worker = function () { return new RealWorker(FF.urls.worker); };
+    try { await ff.load({ coreURL: FF.urls.core, wasmURL: FF.urls.wasm }); } finally { window.Worker = RealWorker; }
+    return ff;
+  } catch (e) { throw new Error('the converter could not be loaded at the "' + step + '" step' + (e && e.message ? ' (' + e.message + ')' : '') + '. The vendor/ffmpeg folder has to sit next to index.html, with all five files'); }
+}
+// kind 'mp4': re-encode to H.264 + AAC. kind 'fix': copy the streams into a clean WebM that has its length and a seek index.
+async function ffConvert(blob, kind, len) {
+  if (S.converting) throw new Error('already converting');
+  S.converting = { cancel: false, ff: null }; $('#rec').disabled = true; $('#convState').hidden = false; $('#resMp4').disabled = true; $('#resFix').disabled = true;
+  const conv = S.converting, bar = $('#convBar'), txt = $('#convText');
+  const status = (t, k) => { txt.textContent = t; bar.style.width = (k == null ? 0 : Math.round(k * 100)) + '%'; };
+  const inExt = blob.type.includes('mp4') ? 'mp4' : 'webm', outExt = kind === 'mp4' || kind === 'aac' ? 'mp4' : inExt, inName = 'in.' + inExt, outName = 'out.' + outExt;
+  try {
+    const ff = await ffEngine(status); conv.ff = ff;
+    if (conv.cancel) throw Object.assign(new Error('cancelled'), { cancelled: true });
+    const logs = []; ff.on('log', ({ message }) => { logs.push(message); if (logs.length > 12) logs.shift(); });
+    ff.on('progress', ({ progress, time }) => {
+      const k = len && time > 0 ? time / 1e6 / len : progress;
+      status((kind === 'mp4' ? 'Converting to MP4' : kind === 'aac' ? 'Making the audio AAC' : 'Fixing the length') + ' ' + Math.round(clamp(k, 0, 1) * 100) + '%', clamp(k, 0, 1));
+    });
+    status('Preparing...', 0);
+    const inBytes = new Uint8Array(await blob.arrayBuffer());
+    await ff.writeFile(inName, inBytes);
+    const crf = { '4': '28', '8': '24', '16': '20' }[look.mbps] || '22', fps = String(parseInt(look.fps, 10) || 30);
+    const args = kind === 'aac'
+      ? ['-i', inName, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outName]
+      : kind === 'mp4'
+      ? ['-i', inName, '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', crf, '-pix_fmt', 'yuv420p', '-r', fps, '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outName]
+      : ['-i', inName, '-c', 'copy'].concat(outExt === 'mp4' ? ['-movflags', '+faststart'] : [], [outName]);
+    const code = await ff.exec(args);
+    if (conv.cancel) throw Object.assign(new Error('cancelled'), { cancelled: true });
+    if (code !== 0) throw new Error('ffmpeg stopped with code ' + code + (logs.length ? ': ' + logs.slice(-3).join(' / ') : ''));
+    const data = await ff.readFile(outName);
+    return new Blob([data.buffer || data], { type: outExt === 'mp4' ? 'video/mp4' : 'video/webm' });
+  } catch (e) { if (conv.cancel) throw Object.assign(new Error('cancelled'), { cancelled: true }); throw e; }
+  finally {
+    try { if (conv.ff) conv.ff.terminate(); } catch (e) {}
+    S.converting = null; $('#convState').hidden = true; $('#resMp4').disabled = false; $('#resFix').disabled = false; if (!S.exporting) $('#rec').disabled = false;
+  }
+}
+async function resConvert(kind) {
+  if (!lastBlob || S.converting) return;
+  try {
+    const out = await ffConvert(lastBlob, kind, lastLen);
+    showResult(out, kind === 'mp4' ? 'mp4' : lastExt, lastLen, true); msg(kind === 'mp4' ? 'Converted to MP4.' : 'The length is fixed.', 'ok');
+  } catch (e) { if (e && e.cancelled) msg('Cancelled.'); else msg('That did not work: ' + (e && e.message || 'error') + '.', 'err'); }
+}
+$('#resMp4').addEventListener('click', () => resConvert('mp4'));
+$('#resFix').addEventListener('click', () => resConvert('fix'));
+$('#convCancel').addEventListener('click', () => { const c = S.converting; if (!c) return; c.cancel = true; try { if (c.ff) c.ff.terminate(); } catch (e) {} });
+$('#autoMp4').checked = !!look.autoMp4; $('#autoMp4').addEventListener('change', e => { look.autoMp4 = e.target.checked; save(); });
 $('#resSave').addEventListener('click', async () => {
   if (!lastBlob) return;
   if (!S.dl) { const a = document.createElement('a'); a.href = URL.createObjectURL(lastBlob); a.download = $('#resSave').dataset.name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); msg('Saved.', 'ok'); return; }
@@ -1432,7 +1721,7 @@ function drawWave(W, H, keysW, P, T, hi, loI, hiI, rowH, sc, playX, over) {
 function drawPortraits(W, H, keysW, P) {
   if (!fx.portShow || !S.ports.size) return;
   const list = [];
-  for (const { t } of allTracks()) { const p = S.ports.get(t.name); if (t.on && p && !list.some(x => x.p === p)) list.push({ t, p }); }
+  for (const { t } of allTracks()) { const p = S.ports.get(t.name); if (t.on && p && !lsActive(t) && !list.some(x => x.p === p)) list.push({ t, p }); }
   if (!list.length) return;
   const dt = S.dt || 0.016, left = keysW, span = W - keysW, n = list.length, hh = H * fx.portSize / 100;
   ctx.save(); ctx.beginPath(); ctx.rect(left, 0, span, H); ctx.clip();
@@ -1443,6 +1732,118 @@ function drawPortraits(W, H, keysW, P) {
     const cx = n > 1 ? left + slot * (i + 0.5) : fx.portPos === 'l' ? left + w / 2 + span * 0.04 : fx.portPos === 'c' ? left + span / 2 : W - w / 2 - span * 0.04;
     ctx.globalAlpha = clamp(fx.portOpacity / 100 * (fx.portReact ? 0.7 + 0.6 * t._pa : 1), 0, 1);
     ctx.drawImage(im, cx - w / 2, H - hh, w, hh);
+  });
+  ctx.restore();
+}
+
+// the lip sync tab: controls, and one card per track with its seven slots
+const LS_WORDS = { a: 'a', i: 'i', u: 'u', e: 'e', o: 'o', n: 'n', m: 'n', closed: 'n', rest: 'r', sil: 'r', silent: 'r', silence: 'r', idle: 'r', neutral: 'r', none: 'r', default: 'r', x: 'r' };
+function lsKeyFor(name) {
+  const tok = name.replace(/\.[^.]+$/, '').toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  for (let i = tok.length - 1; i >= 0; i--) if (LS_WORDS[tok[i]]) return LS_WORDS[tok[i]];
+  return null;
+}
+async function setLsImage(track, key, file) {
+  try { const p = await shrink(await readAsDataURL(file), 768, 'image/png'); const set = S.ls.get(track) || {}; set[key] = p; S.ls.set(track, set); renderLs(); }
+  catch (e) { msg('That image could not be read.', 'err'); }
+}
+function pickLs(track, key) {
+  const inp = $('#filePort'); inp.onchange = () => { if (inp.files[0]) setLsImage(track, key, inp.files[0]); inp.value = ''; }; inp.click();
+}
+function pickLsMany(track) {
+  const inp = $('#fileLs'); inp.onchange = async () => {
+    const files = Array.from(inp.files); inp.value = ''; const miss = [];
+    for (const f of files) { const k = lsKeyFor(f.name); if (k) await setLsImage(track, k, f); else miss.push(f.name); }
+    msg(miss.length ? 'Could not tell which mouth these are for: ' + miss.join(', ') + '. Name them a, i, u, e, o, n or silent.' : 'Mouth images added for ' + track + '.', miss.length ? 'err' : 'ok');
+  }; inp.click();
+}
+function renderLs() {
+  const box = $('#lsList'); if (!box) return;
+  box.replaceChildren();
+  const names = []; for (const { t } of allTracks()) if (!names.includes(t.name)) names.push(t.name);
+  if (!names.length) { box.append(h('div', { class: 'empty' }, 'Load a project to add mouth images for its tracks.')); return; }
+  S.lsSlots = {};
+  for (const n of names) {
+    const set = S.ls.get(n) || {}, have = VIS.filter(([k]) => set[k]).length;
+    const grid = h('div', { class: 'lsg' }, VIS.map(([k, label]) => {
+      const p = set[k], b = h('button', { class: 'lss', type: 'button', 'aria-label': label + ' image for ' + n, onclick: () => pickLs(n, k) },
+        h('div', { class: 'im', style: p ? 'background-image:url(' + p.data + ')' : null }, p ? null : '+'), h('span', { class: 'nm' }, label));
+      b.dataset.tip = p ? 'Click to change the ' + label + ' image.' : 'Click to choose the ' + label + ' image.' + (k === 'r' ? ' It shows while nothing is sung.' : '');
+      (S.lsSlots[n] = S.lsSlots[n] || {})[k] = b; return b;
+    }));
+    box.append(h('div', { class: 'lsc' },
+      h('div', { class: 'lh' }, h('span', { class: 'tn', title: n }, n), h('span', { class: 'nc' }, have + ' of 7'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => pickLsMany(n) }, 'Choose several'),
+        have ? h('button', { class: 'btn small', type: 'button', onclick: () => { S.ls.delete(n); renderLs(); } }, 'Clear') : null),
+      grid));
+  }
+}
+function buildLsCtl() { const b = $('#lsCtl'); if (!b) return; for (const d of FXDEF) if (d.ls) b.append(makeCtl(d, 'ls-')); syncWhen(); }
+let lsNowSig = '';
+function markLsNow() {
+  if (!S.lsSlots || !S.lsNow) return;
+  const sig = JSON.stringify(S.lsNow); if (sig === lsNowSig) return; lsNowSig = sig;
+  for (const n in S.lsSlots) for (const k in S.lsSlots[n]) S.lsSlots[n][k].classList.toggle('now', !!fx.lsOn && S.lsNow[n] === k);
+}
+// ---- lip sync: a set of mouth images for each track, picked by the vowel of the note being sung
+const VIS = [['a', 'A'], ['i', 'I'], ['u', 'U'], ['e', 'E'], ['o', 'O'], ['n', 'N'], ['r', 'Silent']];
+const KANA_V = { a: 'あかさたなはまやらわがざだばぱゃぁ', i: 'いきしちにひみりぎじぢびぴぃゐ', u: 'うくすつぬふむゆるぐずづぶぷゅぅゔ', e: 'えけせてねへめれげぜでべぺぇゑ', o: 'おこそとのほもよろをごぞどぼぽょぉ', n: 'んっ' };
+const KANA_MAP = {}; for (const v in KANA_V) for (const c of KANA_V[v]) KANA_MAP[c] = v;
+// the vowel a lyric ends on: a, i, u, e, o, n (ん and closed mouths), or null when it says nothing (a hold, or empty)
+function vowelOf(lyric) {
+  const s = (lyric || '').trim().toLowerCase(); if (!s || /^[+\-~ー]$/.test(s)) return null;
+  const chars = Array.from(s);
+  for (let i = chars.length - 1; i >= 0; i--) {
+    let c = chars[i]; if (c === 'ー') continue;
+    if (c >= 'ァ' && c <= 'ヶ') c = String.fromCharCode(c.charCodeAt(0) - 0x60);
+    if (KANA_MAP[c]) return c === 'っ' ? 'n' : KANA_MAP[c];
+  }
+  if (/^(?:n|m|ng|nn)$/.test(s)) return 'n';
+  const m = s.match(/[aiueo](?=[^aiueo]*$)/); return m ? m[0] : null;
+}
+function lsSegs(t, off) {
+  const sig = t.notes.length + '|' + off + '|' + fx.utauClean;
+  if (t._vs && t._vs.src === t.notes && t._vs.sig === sig) return t._vs.segs;
+  const segs = []; let prev = 'r';
+  for (const n of t.notes) {
+    if (n.rest) continue;
+    const v = vowelOf(n.lyric);
+    if (v === null && n.conn) continue;
+    const cur = v || prev; prev = cur;
+    segs.push({ t0: n.t0 + off, t1: n.t1 + off, v: cur });
+  }
+  segs.sort((x, y) => x.t0 - y.t0);
+  t._vs = { src: t.notes, sig, segs }; return segs;
+}
+function lsAt(segs, T, hold) {
+  let lo = 0, hi = segs.length - 1, k = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m].t0 <= T) { k = m; lo = m + 1; } else hi = m - 1; }
+  for (let i = k; i >= 0 && i > k - 4; i--) if (T < segs[i].t1 + hold) return { v: segs[i].v, t0: segs[i].t0 };
+  return null;
+}
+function lsActive(t) { const s = S.ls.get(t.name); return !!(fx.lsOn && s && VIS.some(([k]) => s[k])); }
+function drawLipsync(W, H, keysW, P, T) {
+  if (!fx.lsOn || !S.ls.size) return;
+  const list = [];
+  for (const { f, t } of allTracks()) if (t.on && lsActive(t) && !list.some(x => x.t.name === t.name)) list.push({ f, t, set: S.ls.get(t.name) });
+  if (!list.length) return;
+  const left = keysW, span = W - keysW, n = list.length, hh = H * fx.lsSize / 100, hold = fx.lsHold / 1000, fade = fx.lsFade / 1000;
+  ctx.save(); ctx.beginPath(); ctx.rect(left, 0, span, H); ctx.clip();
+  list.forEach((it, i) => {
+    const seg = lsAt(lsSegs(it.t, it.f.offset / 1000), T, hold), v = seg ? seg.v : 'r';
+    const pick = k => it.set[k] || it.set.r || it.set.a || VIS.map(([x]) => it.set[x]).find(Boolean);
+    const st = it.t._ls || (it.t._ls = { cur: v, prev: v, ts: -1e9, lastT: T });
+    if (Math.abs(T - st.lastT) > 0.5) { st.cur = st.prev = v; st.ts = -1e9; }
+    if (v !== st.cur) { st.prev = st.cur; st.cur = v; st.ts = T; }
+    st.lastT = T; S.lsNow = S.lsNow || {}; S.lsNow[it.t.name] = v;
+    const cur = pick(st.cur); if (!cur) return;
+    const w0 = hh * cur.img.naturalWidth / cur.img.naturalHeight, slot = span / n;
+    const cx = n > 1 ? left + slot * (i + 0.5) : fx.lsPos === 'l' ? left + w0 / 2 + span * 0.04 : fx.lsPos === 'c' ? left + span / 2 : W - w0 / 2 - span * 0.04;
+    const pop = seg && fx.lsPop > 0 ? 1 + fx.lsPop / 100 * Math.exp(-Math.max(0, T - seg.t0) * 10) : 1, base = fx.lsOpacity / 100;
+    const draw = (p, a) => { const wp = hh * p.img.naturalWidth / p.img.naturalHeight, h2 = hh * pop, w2 = wp * pop; ctx.globalAlpha = clamp(a, 0, 1); ctx.drawImage(p.img, cx - w2 / 2, H - h2, w2, h2); };
+    const k = fade > 0 ? clamp((T - st.ts) / fade, 0, 1) : 1, pv = k < 1 ? pick(st.prev) : null;
+    if (pv && pv !== cur) { draw(pv, base * (1 - k)); draw(cur, base * k + (1 - k) * 0); }
+    else draw(cur, base);
   });
   ctx.restore();
 }
@@ -1624,6 +2025,7 @@ function markLoRow() {
 
 // visuals tab
 function renderVis() {
+  renderLs();
   const box = $('#portList'); if (!box) return;
   box.replaceChildren();
   const names = []; for (const { t } of allTracks()) if (!names.includes(t.name)) names.push(t.name);
@@ -1663,8 +2065,10 @@ $('#fileLyr').addEventListener('change', async e => {
 function syncAspect() { document.querySelectorAll('#aspect button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === look.size))); }
 document.querySelectorAll('#aspect button').forEach(b => b.addEventListener('click', () => { look.size = b.dataset.size; $('#size').value = look.size; setSize(); save(); syncAspect(); }));
 $('#size').addEventListener('change', syncAspect);
-$('#fromHere').addEventListener('click', () => { $('#expFrom').value = S.time.toFixed(1); });
-$('#toHere').addEventListener('click', () => { $('#expTo').value = S.time.toFixed(1); });
+$('#fromHere').addEventListener('click', () => { $('#expFrom').value = S.time.toFixed(1); syncRange(); });
+$('#toHere').addEventListener('click', () => { $('#expTo').value = S.time.toFixed(1); syncRange(); });
+$('#expFrom').addEventListener('input', syncRange); $('#expTo').addEventListener('input', syncRange);
+$('#rngAll').addEventListener('click', () => { $('#expFrom').value = ''; $('#expTo').value = ''; syncRange(); });
 
 // look files
 function saveBlobAs(blob, name) {
@@ -1747,6 +2151,7 @@ tlBody.addEventListener('pointerup', () => { if (loopDrag == null) return; loopD
 
 // video background: normal, transparent or green screen
 function syncBgMode() {
+  syncMethod();
   $('#bgMode').value = look.bgMode; cv.classList.toggle('alpha', look.bgMode === 'alpha');
   $('#bgHint').textContent = look.bgMode === 'alpha' ? 'Saved as WebM with a transparent background. Turn off Piano keys in Effects if you only want the notes. Use an editor that reads alpha, like Premiere, DaVinci Resolve or AviUtl2 with a WebM plugin.'
     : look.bgMode === 'green' ? 'Fills the video with pure green (#00ff00) so you can key it out in any editor.' : '';
@@ -1792,8 +2197,8 @@ async function runQueue() {
     $('#qState').textContent = 'Rendering ' + (i + 1) + ' of ' + S.queue.length + ': ' + q.proj.name;
     try {
       pause(); S.files = []; S.ci = 0; S.buf = null; S.bufName = ''; S.shift = 0; S.time = 0;
-      addProject(await parseProjectFile(q.proj, fx.bend), q.proj.name);
-      if (q.audio) await loadAudio(q.audio);
+      const pr = await parseProjectFile(q.proj, fx.bend); addProject(pr, q.proj.name);
+      if (q.audio) await loadAudio(q.audio); else if (pr.vocals) await loadVocals(pr.vocals);
       look.caption = $('#qCaption').checked ? q.base : cap0;
       recalc(); renderProjects(); renderAudio();
       const res = await startExport({ whole: true });
@@ -1839,10 +2244,10 @@ function syncTipsBtn() { const b = $('#btnTips'); b.textContent = 'Tips: ' + (ti
 $('#btnTips').addEventListener('click', () => { tipsOn = !tipsOn; try { localStorage.setItem('utaviewer.tips', tipsOn ? 'on' : 'off'); } catch (e) {} hideTip(); syncTipsBtn(); msg(tipsOn ? 'Hover tips on.' : 'Hover tips off.'); });
 for (const [sel, text] of STATIC_TIPS) document.querySelectorAll(sel).forEach(el => { el.dataset.tip = text; el.removeAttribute('title'); });
 syncTipsBtn();
-updateP(); setSize(); buildFx(); buildEditor(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
+updateP(); setSize(); buildFx(); buildLsCtl(); buildEditor(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
 msg('Add project files or drop them on the preview to begin. Only UST files layer together.');
 try { const p = window.claude && window.claude.use ? window.claude.use('downloads') : null; if (p) p.then(d => { S.dl = d; }).catch(() => {}); } catch (e) {}
 requestAnimationFrame(loop);
 // test hook, only with ?test in the address
-if (/[?&]test\b/.test(location.search)) window.__uv = { S, fx, look, PRESETS, allTracks, trackLine, applyPreset, buildPresets, seek, draw, parseTracks: null };
+if (/[?&]test\b/.test(location.search)) window.__uv = { S, fx, look, vowelOf, PRESETS, allTracks, trackLine, applyPreset, buildPresets, seek, draw, parseTracks: null };
 })();

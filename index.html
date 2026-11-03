@@ -171,13 +171,15 @@
         <div class="hint" id="rngInfo"></div>
         <div class="row"><button class="btn small" id="rngAll" type="button">Whole project</button></div>
         <div class="sec">Record</div>
+        <div class="row"><label for="method">Method</label>
+          <select id="method"><option value="exact">Exact frames</option><option value="live">Live recording</option></select></div>
         <div class="row"><label for="fps">Frame rate</label>
           <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
         <div class="row"><label for="mbps">Video quality</label>
           <select id="mbps"><option value="4">Light (4 Mbps)</option><option value="8">Standard (8 Mbps)</option><option value="16">High (16 Mbps)</option></select></div>
         <label class="chk" id="autoMp4Row" for="autoMp4"><input type="checkbox" id="autoMp4"><span>Convert to MP4 or fix the length after recording</span></label>
-        <p class="hint">Recording plays the whole project once in real time and captures the canvas plus any loaded audio. Keep this tab in the foreground until it finishes.</p>
-        <button class="btn primary" id="rec" type="button">Record video</button>
+        <p class="hint" id="methodHint"></p>
+        <button class="btn primary" id="rec" type="button">Render video</button>
         <div id="recState" hidden>
           <div class="bar"><i id="recBar"></i></div>
           <div class="hint" id="recText" style="margin-top:6px"></div>

@@ -1,5 +1,28 @@
 # Changelog
 
+## UtaViewer 1.5.0
+
+### Major features
+- Exact frame rendering: every frame is drawn at its own moment and encoded directly (WebCodecs), so a 60 fps video really is 60 fps even on a slow computer, instead of whatever the computer managed to record. It also works with the tab in the background. Live recording is still there as a choice, and is used automatically in Firefox and for transparent video
+- NEUTRINO projects (zip the project folder): notes, pitch curve and the rendered vocals as audio
+- MusicXML files (.musicxml, .mxl)
+- Lip sync tab: a set of mouth images (A, I, U, E, O, N and Silent) for each track that follows the vowel of the note being sung
+- MP4 in every browser: browsers that only record WebM get a Convert to MP4 button (H.264 and AAC) in the Export tab, or leave the automatic option on. It runs in the page with a bundled copy of ffmpeg, so nothing is uploaded
+- Experimental macOS and Linux desktop apps next to the Windows one, built automatically for each release. All desktop apps now have an icon and run from their own secure address instead of file://
+
+### Minor additions
+- Breaths and pauses in NEUTRINO and MusicXML files show as rests, and closures ("cl") are not shown as lyrics
+- Fix length button for recordings
+- Export range shows the exact start, end and length, and a Whole project button clears it
+- Soft fades on buttons, tabs and panels (off when the system asks for reduced motion)
+
+### Fixes
+- Recorded WebM files had no length stored, so players showed a start time but no end time and could not skip ahead. Convert to MP4 or Fix length repairs this
+- The MP4 converter now works when index.html is opened straight from disk (it failed to load there), and its files are compressed to about 13 MB in total (no file over 7 MB), well inside GitHub's upload limits. Load errors now say which step failed
+- Windows: recording could produce an empty 0 MB MP4. The H.264 level now matches the video size and frame rate, and if a recording still comes out empty the app switches to WebM by itself (and converts it to MP4)
+- The second song in a render queue could save as an empty file when it had no audio
+- An end time before the start now says so instead of silently recording the whole project
+
 ## UtaViewer 1.4.0
 
 ### Major features
