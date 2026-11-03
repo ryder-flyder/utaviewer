@@ -1,4 +1,4 @@
-name: Windows release
+name: Desktop builds
 
 on:
   push:
@@ -10,32 +10,73 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: win32,  arch: x64,   name: UtaViewer-windows-x64 }
+          - { os: macos-latest,   platform: darwin, arch: arm64, name: UtaViewer-mac-apple-silicon }
+          - { os: macos-latest,   platform: darwin, arch: x64,   name: UtaViewer-mac-intel }
+          - { os: ubuntu-latest,  platform: linux,  arch: x64,   name: UtaViewer-linux-x64 }
+    runs-on: ${{ matrix.os }}
+    env:
+      UV_PLATFORM: ${{ matrix.platform }}
+      UV_ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build the Windows app
+      - name: Build the app
         working-directory: desktop
         run: |
           npm install
           npm run build
-      - name: Zip it
+
+      - name: Package (Windows)
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: Compress-Archive -Path "desktop/dist/UtaViewer-win32-x64" -DestinationPath "${{ matrix.name }}.zip"
+
+      - name: Package (macOS)
+        if: matrix.platform == 'darwin'
+        working-directory: desktop/dist/UtaViewer-darwin-${{ matrix.arch }}
+        run: ditto -c -k --sequesterRsrc --keepParent UtaViewer.app "$GITHUB_WORKSPACE/${{ matrix.name }}.zip"
+
+      - name: Package (Linux)
+        if: matrix.platform == 'linux'
         working-directory: desktop/dist
-        run: zip -r ../../UtaViewer-win-x64.zip UtaViewer-win32-x64
+        run: |
+          # launcher passes --no-sandbox
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/UtaViewer" --no-sandbox "$@"\n' > UtaViewer-linux-x64/start-utaviewer.sh
+          chmod +x UtaViewer-linux-x64/start-utaviewer.sh UtaViewer-linux-x64/UtaViewer
+          tar -czf "$GITHUB_WORKSPACE/${{ matrix.name }}.tar.gz" UtaViewer-linux-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            ${{ matrix.name }}.zip
+            ${{ matrix.name }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          NOTES="Windows is the main desktop build. The macOS and Linux builds are experimental; the web version is the safest fallback. See the README for how to open them."
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" UtaViewer-win-x64.zip --clobber
+            gh release upload "${{ github.ref_name }}" dist/* --clobber
           else
-            gh release create "${{ github.ref_name }}" UtaViewer-win-x64.zip --title "UtaViewer ${{ github.ref_name }}" --notes "Windows 64-bit build. Unzip and run UtaViewer.exe."
+            gh release create "${{ github.ref_name }}" dist/* --title "UtaViewer ${{ github.ref_name }}" --notes "$NOTES"
           fi
-      - name: Keep the zip as a workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: UtaViewer-win-x64
-          path: UtaViewer-win-x64.zip
