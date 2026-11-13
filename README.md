@@ -6,7 +6,7 @@ UtaViewer plays vocal synth projects on a piano roll, with the pitch curves and 
 
 ## Supported files
 
-`.ust` `.ustx` `.vsq` `.vsqx` `.vpr` `.svp` `.ccs` `.tssln` `.mid` `.musicxml` `.mxl`, and NEUTRINO projects as a `.zip` of the project folder
+`.ust` `.ustx` `.vsq` `.vsqx` `.vpr` `.vprx` `.svp` `.ccs` `.tssln` `.mid` `.musicxml` `.mxl`, and NEUTRINO projects as a `.zip` of the project folder
 
 Synthesizer V Studio 1 and Studio 2 projects both work, and the badge on each file shows which one it is. Several UST files can share one roll. Any other project replaces the one that's loaded. NEUTRINO: zip the whole project folder (the one with the `edit` and `render` folders) and add the zip. The notes and the pitch curve in `edit` are used, and if the project has been rendered, the sound of each phrase is joined into one audio track. A `.ntpj` file on its own only points to those files, so it can't be read by itself. A bare `score.xml` or any part-wise MusicXML file works for the notes alone.
 

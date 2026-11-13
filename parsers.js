@@ -351,9 +351,45 @@ function parseSVP(bytes) {
   return { fmt: 'SVP', variant: v2 ? 'Studio 2' : 'Studio 1', title: (j.meta && j.meta.name) || '', tm, tracks };
 }
 
-async function parseVPR(buf) {
+// Pencil strokes (VOCALOID 6.5 and 7): every note stores the part of the drawn pitch that crosses it as directPitches
+// ({pos: ticks from the note start, value: cents from the note's own pitch}), and a stroke that spans several notes
+// is repeated in each. Values are made absolute and merged; where copies disagree, the note nearest the tick wins.
+// A "ZeroPitch" entry ends a stroke.
+function directPitchFn(notes, partPos) {
+  const at = new Map();
+  for (const n of notes) {
+    const s = partPos + (n.pos || 0), e = s + (n.duration || 0);
+    for (const p of n.directPitches || []) {
+      const t = s + p.pos, d = t < s ? s - t : t > e ? t - e : 0, y = typeof p.value === 'number' ? n.number * 100 + p.value : null;
+      const o = at.get(t);
+      if (!o || d < o.d || (d === o.d && o.y == null && y != null)) at.set(t, { d, y });
+    }
+  }
+  if (!at.size) return null;
+  const segs = []; let cur = [];
+  for (const t of [...at.keys()].sort((a, b) => a - b)) {
+    const y = at.get(t).y;
+    if (y == null) { if (cur.length) { cur.push([t, cur[cur.length - 1][1]]); segs.push(cur); cur = []; } }
+    else cur.push([t, y]);
+  }
+  if (cur.length) segs.push(cur);
+  if (!segs.length) return null;
+  return tick => {
+    let lo = 0, hi = segs.length - 1, k = -1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (segs[m][0][0] <= tick) { k = m; lo = m + 1; } else hi = m - 1; }
+    if (k < 0) return null;
+    const sg = segs[k]; if (tick > sg[sg.length - 1][0]) return null;
+    let a = 0, b = sg.length - 1;
+    while (b - a > 1) { const m = (a + b) >> 1; if (sg[m][0] <= tick) a = m; else b = m; }
+    if (sg.length === 1) return sg[0][1];
+    const u = (tick - sg[a][0]) / ((sg[b][0] - sg[a][0]) || 1);
+    return sg[a][1] + (sg[b][1] - sg[a][1]) * Math.min(1, Math.max(0, u));
+  };
+}
+
+async function parseVPR(buf, ext) {
   const zip = await JSZip.loadAsync(buf);
-  const entry = zip.file(/sequence\.json$/i)[0]; if (!entry) throw new Error('No sequence.json inside this VPR');
+  const entry = zip.file(/sequence\.json$/i)[0]; if (!entry) throw new Error('No sequence.json inside this ' + (ext === 'vprx' ? 'VPRX' : 'VPR'));
   const j = JSON.parse(await entry.async('string')), res = 480;
   const evs = (j.masterTrack && j.masterTrack.tempo && j.masterTrack.tempo.events) || [];
   const tm = makeTempoMap(evs.length ? evs.map(e => ({ tick: e.pos, bpm: e.value / 100 })) : [{ tick: 0, bpm: 120 }], res), tracks = [];
@@ -363,11 +399,16 @@ async function parseVPR(buf) {
       if (!part.notes || !part.notes.length) continue;
       const ctl = name => { const c = (part.controllers || []).find(x => x.name === name); return c ? (c.events || []).map(e => [e.pos, e.value]) : []; };
       const bf = bendFn(tm, part.pos || 0, ctl('pitchBend'), ctl('pitchBendSens'));
-      for (const n of part.notes) { const a = (part.pos || 0) + n.pos; notes.push(mkNote(tm.t2s(a), tm.t2s(a + n.duration), n.number, cleanLyric(n.lyric), [bf])); }
+      const dp = directPitchFn(part.notes, part.pos || 0);
+      for (const n of part.notes) {
+        const a = (part.pos || 0) + n.pos;
+        const f = !dp ? bf : t => { const c = dp(tm.s2t(t)); return c == null ? (bf ? bf(t) : 0) : c / 100 - n.number; };
+        notes.push(mkNote(tm.t2s(a), tm.t2s(a + n.duration), n.number, cleanLyric(n.lyric), [f]));
+      }
     }
     if (notes.length) { notes.sort((a, b) => a.t0 - b.t0); tracks.push({ name: tr.name || ('Track ' + (i + 1)), notes }); }
   });
-  return { fmt: 'VPR', title: j.title || '', tm, tracks };
+  return { fmt: ext === 'vprx' ? 'VPRX' : 'VPR', title: j.title || '', tm, tracks };
 }
 
 function parseCCS(text) {
@@ -710,7 +751,7 @@ async function parseMXL(buf) {
   return parseMusicXML(await f.async('string'));
 }
 
-const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsq: 'a VOCALOID 2 project', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project', zip: 'a NEUTRINO project', ntpj: 'a NEUTRINO project', xml: 'a MusicXML or NEUTRINO score', musicxml: 'a MusicXML file', mxl: 'a compressed MusicXML file' };
+const KIND = { ustx: 'an OpenUtau project', ust: 'a UST file', mid: 'a MIDI file', midi: 'a MIDI file', vsq: 'a VOCALOID 2 project', vsqx: 'a VOCALOID 4 project', vpr: 'a VOCALOID 6 project', vprx: 'a VOCALOID 7 project', svp: 'a Synthesizer V project', ccs: 'a CeVIO project', tssln: 'a VoiSona project', zip: 'a NEUTRINO project', ntpj: 'a NEUTRINO project', xml: 'a MusicXML or NEUTRINO score', musicxml: 'a MusicXML file', mxl: 'a compressed MusicXML file' };
 async function parseProjectFile(file, bendRange) {
   const ext = file.name.split('.').pop().toLowerCase(), buf = await file.arrayBuffer();
   if (!KIND[ext]) throw new Error('Unsupported file type .' + ext);
@@ -722,7 +763,7 @@ async function parseProjectFile(file, bendRange) {
     else if (ext === 'mid' || ext === 'midi') r = parseMIDI(buf, bendRange);
     else if (ext === 'vsq') r = parseVSQ(buf);
     else if (ext === 'vsqx') r = parseVSQX(decodeText(new Uint8Array(buf)));
-    else if (ext === 'vpr') r = await parseVPR(buf);
+    else if (ext === 'vpr' || ext === 'vprx') r = await parseVPR(buf, ext);
     else if (ext === 'svp') r = parseSVP(new Uint8Array(buf));
     else if (ext === 'ccs') r = parseCCS(decodeText(new Uint8Array(buf)));
     else if (ext === 'zip') r = await parseNTPJ(buf);

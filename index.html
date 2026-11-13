@@ -18,13 +18,14 @@
   <header class="top">
     <div class="brand"><svg class="logo" viewBox="0 0 32 32" width="30" height="30" role="img" aria-label="UtaViewer logo"><rect width="32" height="32" rx="7" fill="var(--accent)"/><rect x="6" y="9" width="10" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="12" y="15" width="14" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="8" y="21" width="8" height="4" rx="1.5" fill="var(--accent-fg)"/><rect x="21" y="9" width="5" height="4" rx="1.5" fill="var(--accent-fg)" opacity=".55"/></svg><h1>UtaViewer</h1><span class="ver" id="ver" title="Version"></span></div>
     <div class="actions">
-      <button class="btn" id="btnProj" type="button">Add project files</button>
+      <button class="btn" id="btnProj" type="button">Add project</button>
       <button class="btn" id="btnAudio" type="button">Add audio</button>
       <button class="btn" id="btnTheme" type="button" title="Switch between automatic, light and dark">Theme: Auto</button>
       <button class="btn" id="btnTips" type="button" aria-pressed="true">Tips: On</button>
       <button class="btn" id="btnHelp" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
+      <a class="btn" id="btnGit" href="https://github.com/ryder-flyder/utaviewer" target="_blank" rel="noopener" title="UtaViewer on GitHub">GitHub</a>
       <button class="btn primary" id="btnExport" type="button">Export</button>
-      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl">
+      <input id="fileProj" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.vprx,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl">
       <input id="fileAudio" type="file" hidden accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a">
       <input id="filePort" type="file" hidden accept="image/*">
       <input id="fileLs" type="file" multiple hidden accept="image/*">
@@ -43,36 +44,33 @@
         <div id="fileList"></div>
         <div id="audioBox"></div>
         <div id="quick"></div>
-        <div class="sec">Portraits</div>
-        <p class="hint">One image per track, laid under the notes. Opacity, size and position are in Effects. Turn them on below.</p>
-        <label class="chk" for="portShow"><input type="checkbox" id="portShow"><span>Show portraits</span></label>
+        <div class="sec">Images</div>
+        <label class="chk" for="portShow"><input type="checkbox" id="portShow"><span>Portraits</span></label>
         <div id="portList"></div>
-        <div class="sec">Background</div>
         <div id="bgBox"></div>
-        <p class="hint">Dim and blur are in Effects.</p>
         <div class="sec">Lyric box</div>
-        <div class="row stack"><label for="lyrSrc">Lyrics come from</label>
+        <div class="row stack"><label for="lyrSrc">Source</label>
           <select id="lyrSrc">
-            <option value="notes">The notes in the project</option>
-            <option value="text">Text below, following the note phrases</option>
-            <option value="even">Text below, spread evenly over the song</option>
+            <option value="notes">Notes</option>
+            <option value="text">Text, by phrase</option>
+            <option value="even">Text, even</option>
           </select></div>
         <div class="row stack"><label for="lyrTrack">Track</label><select id="lyrTrack"></select></div>
-        <textarea id="lyrText" rows="7" spellcheck="false" placeholder="One line per phrase. Lines that start with [mm:ss.xx] are timed exactly (LRC)."></textarea>
+        <textarea id="lyrText" rows="7" spellcheck="false" placeholder="One line per phrase. [mm:ss.xx] times a line."></textarea>
         <div class="btns">
-          <button class="btn small" id="lyrFile" type="button">Load .txt / .lrc</button>
+          <button class="btn small" id="lyrFile" type="button">Load file</button>
           <button class="btn small" id="lyrClear" type="button">Clear text</button>
         </div>
-        <div class="row stack"><label for="lyr2">Second line under the lyrics</label>
+        <div class="row stack"><label for="lyr2">Second line</label>
           <select id="lyr2">
             <option value="off">Off</option>
-            <option value="romaji">Romaji, converted from kana</option>
-            <option value="typed">A line I type (reading, romaji or translation)</option>
+            <option value="romaji">Romaji</option>
+            <option value="typed">Typed</option>
           </select></div>
-        <textarea id="lyrText2" rows="5" spellcheck="false" hidden placeholder="One line for each lyric line, in the same order."></textarea>
-        <label class="chk" for="lyrShow"><input type="checkbox" id="lyrShow"><span>Show the lyric box</span></label>
+        <textarea id="lyrText2" rows="5" spellcheck="false" hidden placeholder="One line per lyric line."></textarea>
+        <label class="chk" for="lyrShow"><input type="checkbox" id="lyrShow"><span>Lyric box</span></label>
         <p class="hint" id="lyrInfo"></p>
-        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsq</code> <code>.vsqx</code> <code>.vpr</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code> <code>.musicxml</code> and NEUTRINO projects as a <code>.zip</code> of the project folder</div>
+        <div class="fmts">Supported: <code>.ust</code> <code>.ustx</code> <code>.vsq</code> <code>.vsqx</code> <code>.vpr</code> <code>.vprx</code> <code>.svp</code> <code>.ccs</code> <code>.tssln</code> <code>.mid</code> <code>.musicxml</code> and NEUTRINO folders as <code>.zip</code></div>
       </div>
 
     </aside>
@@ -80,7 +78,7 @@
   <section class="stage" aria-label="Preview">
     <div class="screen" id="screen">
       <canvas id="cv" width="1920" height="1080" aria-label="Piano roll preview"></canvas>
-      <div class="drop">Drop project or audio files</div>
+      <div class="drop">Drop files</div>
     </div>
     <div class="transport">
       <div class="tcL" id="tcInfo"></div>
@@ -104,14 +102,13 @@
       <div class="pane" data-pane="fx" id="fxPane"></div>
 
       <div class="pane" data-pane="look" hidden>
-        <label class="chk" for="autoStyle"><input type="checkbox" id="autoStyle"><span>Match the style to the loaded file type</span></label>
+        <label class="chk" for="autoStyle"><input type="checkbox" id="autoStyle"><span>Match file style</span></label>
         <div class="sec">Viewer look</div>
         <div class="seg" id="shade" role="group" aria-label="Viewer light or dark"><button class="btn small" type="button" data-v="dark">Dark</button><button class="btn small" type="button" data-v="light">Light</button></div>
         <p class="hint" id="shadeHint"></p>
         <div id="presetGroups"></div>
-        <div class="sec">Edit colors</div>
+        <div class="sec">Colors</div>
         <div class="cgrid" id="colorGrid"></div>
-        <div class="sec">Track palette</div>
         <div class="pal" id="palette"></div>
         <div class="btns">
           <button class="btn small" id="applyPal" type="button">Apply palette to tracks</button>
@@ -128,9 +125,8 @@
             <option value="1080x1920">1080 × 1920 (vertical)</option>
             <option value="1080x1080">1080 × 1080 (square)</option>
           </select></div>
-        <div class="row"><label for="caption">Caption</label><input id="caption" type="text" maxlength="80" placeholder="Song title, shown top left"></div>
+        <div class="row"><label for="caption">Caption</label><input id="caption" type="text" maxlength="80" placeholder="Song title"></div>
         <div class="sec">Share a theme</div>
-        <p class="hint">Saves the colors and effects of the current look as a small JSON file (portraits, backgrounds and lyrics are not included). Load one to add someone else's theme.</p>
         <div class="row"><label for="themeName">Name</label><input id="themeName" type="text" maxlength="40" placeholder="My theme"></div>
         <div class="btns">
           <button class="btn small" id="themeSave" type="button">Save theme file</button>
@@ -140,11 +136,11 @@
       </div>
 
       <div class="pane" data-pane="ls" hidden>
-        <p class="hint">Give a track a set of mouth images. While it sings, the picture follows the vowel of the note: か shows the A image, し the I image, ん the N image, and the Silent image shows whenever nothing is sung. Optional, and it replaces that track's portrait while it is on.</p>
+        <p class="hint">Mouth images by vowel: か = A, し = I, ん = N. Silent when no note. Replaces the portrait.</p>
         <div id="lsCtl"></div>
         <div class="sec">Characters</div>
         <div id="lsList"></div>
-        <p class="hint">Images are kept for this session only, like portraits. Name the files a, i, u, e, o, n and silent (or rest) and choose them all at once to fill a set in one go.</p>
+        <p class="hint">Name files a, i, u, e, o, n, silent to fill a set at once.</p>
       </div>
 
       <div class="pane" data-pane="exp" hidden>
@@ -152,7 +148,7 @@
         <div class="row stack"><label for="bgMode">Video background</label>
           <select id="bgMode">
             <option value="normal">Normal</option>
-            <option value="alpha">Transparent (WebM with alpha)</option>
+            <option value="alpha">Transparent</option>
             <option value="green">Green screen</option>
           </select></div>
         <p class="hint" id="bgHint"></p>
@@ -177,7 +173,7 @@
           <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
         <div class="row"><label for="mbps">Video quality</label>
           <select id="mbps"><option value="4">Light (4 Mbps)</option><option value="8">Standard (8 Mbps)</option><option value="16">High (16 Mbps)</option></select></div>
-        <label class="chk" id="autoMp4Row" for="autoMp4"><input type="checkbox" id="autoMp4"><span>Convert to MP4 or fix the length after recording</span></label>
+        <label class="chk" id="autoMp4Row" for="autoMp4"><input type="checkbox" id="autoMp4"><span>Auto convert</span></label>
         <p class="hint" id="methodHint"></p>
         <button class="btn primary" id="rec" type="button">Render video</button>
         <div id="recState" hidden>
@@ -186,16 +182,16 @@
           <button class="btn small" id="recCancel" type="button" style="margin-top:8px">Cancel</button>
         </div>
         <div class="sec">Render queue</div>
-        <p class="hint">Add several songs and render them one after another with the current look. Put an audio file with the same name next to each project and it plays along. Each file saves when it finishes.</p>
+        <p class="hint">Same-name audio plays along.</p>
         <div id="queueList"></div>
-        <label class="chk" for="qCaption"><input type="checkbox" id="qCaption"><span>Use each file name as the caption</span></label>
+        <label class="chk" for="qCaption"><input type="checkbox" id="qCaption"><span>File name caption</span></label>
         <div class="btns">
           <button class="btn small" id="qAdd" type="button">Add files</button>
           <button class="btn small primary" id="qRun" type="button">Render queue</button>
           <button class="btn small" id="qClear" type="button">Clear</button>
         </div>
         <div class="hint" id="qState"></div>
-        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
+        <input id="fileQueue" type="file" multiple hidden accept=".ustx,.ust,.mid,.midi,.vsq,.vsqx,.vpr,.vprx,.svp,.ccs,.tssln,.zip,.ntpj,.xml,.musicxml,.mxl,audio/*,.wav,.mp3,.ogg,.flac,.m4a">
         <div class="result" id="result" hidden>
           <video id="resVideo" controls playsinline hidden></video>
           <div class="hint" id="resInfo"></div>
@@ -232,14 +228,14 @@
   <h2>Keyboard shortcuts</h2>
   <dl>
     <dt>Space</dt><dd>Play or pause</dd>
-    <dt>Drag audio</dt><dd>Slide the audio lane on the timeline (snaps to beats and notes; hold Alt to move freely)</dd>
-    <dt>← →</dt><dd>Back or forward 2 s (Shift: 10 s)</dd>
-    <dt>Home / End</dt><dd>Jump to start or end</dd>
-    <dt>+ / −</dt><dd>Zoom the piano roll in or out</dd>
-    <dt>F</dt><dd>Full screen preview</dd>
-    <dt>L</dt><dd>Show or hide the lyric box</dd>
-    <dt>[ and ]</dt><dd>Loop start and end at the playhead</dd>
-    <dt>R / Esc</dt><dd>Loop on or off / clear the loop</dd>
+    <dt>Drag audio</dt><dd>Slide the audio lane (Alt: free)</dd>
+    <dt>← →</dt><dd>Seek 2 s (Shift: 10 s)</dd>
+    <dt>Home / End</dt><dd>Start or end</dd>
+    <dt>+ / −</dt><dd>Zoom</dd>
+    <dt>F</dt><dd>Full screen</dd>
+    <dt>L</dt><dd>Lyric box</dd>
+    <dt>[ and ]</dt><dd>Set loop start and end</dd>
+    <dt>R / Esc</dt><dd>Loop on or off / clear</dd>
     <dt>1 – 5</dt><dd>Editor, Effects, Look, Lip sync, Export</dd>
     <dt>?</dt><dd>This list</dd>
   </dl>

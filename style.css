@@ -232,3 +232,5 @@ select:focus-visible,input[type=text]:focus-visible,input[type=number]:focus-vis
 @keyframes uvFade{from{opacity:0}to{opacity:1}}
 .pane:not([hidden]),.result:not([hidden]),#recState:not([hidden]),#convState:not([hidden]),#resConv:not([hidden]){animation:uvIn .18s var(--ease)}
 #tip:not([hidden]){animation:uvFade .12s ease-out}
+
+#btnGit { color: inherit; text-decoration: none; }

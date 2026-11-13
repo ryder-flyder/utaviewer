@@ -1,5 +1,15 @@
 # Changelog
 
+## UtaViewer 1.5.1
+
+### Major features
+- VOCALOID 7 support (.vprx), including pitch drawn with the pencil tool
+- Drawn pitch in VOCALOID 6.5 projects now shows too
+
+### Minor additions
+- GitHub link in the top bar
+- Shorter labels and merged sections in the side panels
+
 ## UtaViewer 1.5.0
 
 ### Major features

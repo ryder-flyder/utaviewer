@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const $ = (s, r = document) => r.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function h(tag, props, ...kids) {
@@ -34,7 +34,7 @@ const PRESETS = {
   'VoiSona': { g: 'Editors', bg1: '#0d0e13', bg2: '#0b0c10', grid: '#c8c8d4', rowW: '#000000', rowWA: 0, rowB: '#000000', rowBA: 0.35, rows: ['#c98a8a', '#14151b', '#6fa06f', '#14151b', '#5a8fb0', '#9a7ac0', '#14151b', '#b06a8a', '#14151b', '#7a6ac0', '#14151b', '#6a9a9a'], rowTintA: 0.34, keyW: '#fafafa', keyB: '#101114', fg: '#f2f2f6', play: '#f7931e', hi: '#fff0d0', act: '#ffffff', pitch: '#ffe0a8', edge: '', palette: ['#ff9a1f', '#4ad0c0', '#7aa2ff', '#ff7aa8', '#b69cff', '#9be07a'], fx: { glow: 0, sparks: false, round: 6, noteH: 94, outline: 0, pitchMode: 'always', pitchW: 1.8, dim: 35 } },
   'OpenUtau': { g: 'Editors', bg1: '#ffffff', bg2: '#f7f7f9', grid: '#8d8d9a', rowW: '#fbfbfc', rowWA: 1, rowB: '#ececf0', rowBA: 1, keyW: '#ffffff', keyB: '#ff4f8b', fg: '#2a2a33', play: '#6c6c7a', hi: '#d6ecff', act: '#0f5fa8', pitch: '#ff3d7f', edge: '', palette: ['#4da3e8', '#ff6aa0', '#5cc48a', '#f2a93b', '#9b7be0', '#35b9c9'], fx: { glow: 0, sparks: false, round: 6, noteH: 88, outline: 0, pitchMode: 'always', pitchW: 1.6, dim: 25 } },
 };
-const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQ: 'VOCALOID 4', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default', NEUTRINO: 'Default', MusicXML: 'Default' };
+const FMT_STYLE = { USTX: 'OpenUtau', UST: 'OpenUtau', SVP: 'Synthesizer V', VSQ: 'VOCALOID 4', VSQX: 'VOCALOID 4', VPR: 'VOCALOID 6', VPRX: 'VOCALOID 6', CCS: 'CeVIO AI', TSSLN: 'VoiSona', MIDI: 'Default', NEUTRINO: 'Default', MusicXML: 'Default' };
 // colour helpers: themes are built in HSL so the light versions stay vivid instead of turning muddy
 const toHex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
 const hslOf = x => {
@@ -104,288 +104,228 @@ const CASES = [['asis', 'As written'], ['upper', 'UPPERCASE'], ['lower', 'lowerc
 const caseOf = (t, m) => m === 'upper' ? t.toUpperCase() : m === 'lower' ? t.toLowerCase() : m === 'title' ? t.replace(/(^|[\s\-'])(\p{L})/gu, (a, b, c) => b + c.toUpperCase()) : t;
 
 const TIPS = {
-  highlight: 'Brightens the note that is being sung right now.',
-  flash: 'A quick flash on each note the moment it starts.',
-  progress: 'Fills each note from left to right as it plays.',
-  glow: 'Soft light around the notes, the pitch line and the playhead. Set to 0 for a flat look.',
-  glowColor: 'Which color the glow uses.',
-  sparks: 'Little particles that fly off the playhead on every new note.',
-  pulse: 'The playhead swells on each beat of the song’s tempo.',
-  pitch: 'Draws the pitch curve of the singing as a line over the notes.',
-  pitchMode: 'How the curve appears: drawn as it plays, shown in full, or as a fading trail.',
-  pitchColor: 'Use the theme’s pitch color, a lighter tint of each track, or the track color itself.',
-  pitchW: 'Thickness of the pitch line.',
-  lineGap: 'Notes closer together than this share one unbroken pitch line. Set to 0 to break the line at every gap.',
-  trail: 'How long the fading trail stays behind the playhead.',
-  head: 'A dot where the pitch line meets the playhead.',
-  bend: 'How many semitones a full pitch bend moves, for MIDI files. Applies to files added after you change it.',
-  lyrics: 'Show each note’s lyric on the piano roll.',
-  lyricMode: 'Put the lyric inside the note, above it, or inside when it fits and above when it does not.',
-  lyricSize: 'Size of the lyrics on the notes.',
-  lyFont: 'Typeface for the lyrics on the notes. These come with your system, so how they look depends on your computer.',
-  lyWeight: 'How thick the letters are.',
-  lyItalic: 'Slant the lyrics.',
-  lyCase: 'Show lyrics as written, in capitals, in small letters, or with capital first letters.',
-  lySpacing: 'Space between letters.',
-  lyColor: 'Automatic picks black or white to suit each note. Or use the theme text color or your own.',
-  lyColorC: 'Pick the color for all note lyrics.',
-  lyOut: 'An edge around the letters, light on dark text and dark on light text. Helps on busy backgrounds.',
-  lyShadow: 'A soft shadow under the lyrics.',
-  lyrPos: 'Which corner the lyric box sits in.',
-  lyrSize: 'Size of the whole lyric box.',
-  lyrKaraoke: 'Words change color as they are sung.',
-  lbKStyle: 'How the lyric box shows which word is being sung.',
-  lbUnsung: 'How visible words are before they are sung. Lower is fainter.',
-  lyrBox: 'A panel behind the lyric box text. Turn off to draw plain text.',
-  lyrNext: 'Shows the coming line in small type under the current one.',
-  lyrRoll: 'Use the lyric edits you made note by note on the piano roll as well. Off keeps the roll showing the project’s own lyrics.',
-  lbFont: 'Typeface for the lyric box. These come with your system, so how they look depends on your computer.',
-  lbWeight: 'How thick the letters are.',
-  lbItalic: 'Slant the lyric box text.',
-  lbCase: 'Show the text as written, in capitals, in small letters, or with capital first letters.',
-  lbSpacing: 'Space between letters.',
-  lbAlign: 'Line up the text to the left, center or right of the box.',
-  lbLine: 'Space between lines of text.',
-  lbSec: 'Size of the second line (romaji or typed) compared with the main line.',
-  lbColor: 'Color of words that are not sung yet.',
-  lbColorC: 'Pick the color for lyric box text.',
-  lbLit: 'Color of words once they are sung.',
-  lbLitC: 'Pick the color for sung words.',
-  lbOut: 'An edge around the letters, light on dark text and dark on light text.',
-  lbShadow: 'A soft shadow under the text. Always on when the panel is off.',
-  lbPanel: 'Color of the panel behind the text.',
-  lbPanelC: 'Pick the panel color.',
-  lbPanelA: 'How see-through the panel is. 0 hides it, 100 is solid.',
-  lbRadius: 'How round the panel corners are.',
-  lbPad: 'Space between the text and the panel edge.',
-  portShow: 'Show a character image behind the notes.',
-  portOpacity: 'How see-through the portraits are.',
-  portSize: 'Portrait height as a share of the video height.',
-  portPos: 'Which side the portrait sits on.',
-  portReact: 'Portraits get a little brighter while their track is singing.',
-  bgDim: 'Darkens the background image or video so the notes stand out.',
-  bgBlur: 'Blurs the background image or video.',
-  wfStyle: 'An audio visualizer drawn from the audio file you add. One style at a time.',
-  wfColor: 'Use the theme palette or two colors of your own.',
-  wfColA: 'Color for lines and the low end.',
-  wfColB: 'Color for peaks and tops.',
-  wfOpacity: 'How see-through the visualizer is.',
-  wfGain: 'How strongly the visualizer reacts to the audio.',
-  wfOver: 'Draw the visualizer on top of the notes instead of behind them.',
-  wfScopeW: 'Thickness of the scope line.',
-  wfScopeY: 'Where the scope line sits, from top to bottom.',
-  wfBarN: 'How many bars the spectrum has.',
-  lsOn: 'Swap each track’s picture for the mouth image that matches the vowel being sung.',
-  lsSize: 'How tall the lip sync picture is, as a share of the view.',
-  lsPos: 'Where the picture sits. With several characters they share the width.',
-  lsOpacity: 'How solid the picture is.',
-  lsHold: 'Mouths stay on the last vowel for a moment so quick notes do not flicker.',
-  lsFade: 'Fade from one image to the next. 0 switches instantly.',
-  lsPop: 'The picture swells slightly when each note starts, and settles back.',
-  utauClean: 'UST and USTX lyrics often hold more than the syllable: VCV parts like "a ka", CVVC parts like "a k", breaths and arrows. When this is on, only the sung syllable is shown on the notes and in the lyric box. Other file types are not affected.',
-  pvQ: 'How sharp the preview is. Lower is smoother on slower computers. Videos are always recorded at the full video size.',
-  pvFps: 'Draw the preview 30 times a second instead of matching the screen. Recorded video is not affected.',
-  pvLite: 'Turns off glow in the preview only, which is the heaviest effect. Recorded video still uses your glow setting.',
-  wfW: 'How wide the visualizer is. Lower it to make it smaller.',
-  wfH: 'How tall the visualizer area is. Lower it to make it smaller.',
-  wfPX: 'Slide the visualizer left or right inside the view.',
-  wfPY: 'Slide the visualizer up or down inside the view.',
-  wfBarH: 'How tall the bars can grow.',
-  wfBarPos: 'Bars grow from the bottom, the top or the middle.',
-  wfKeyLen: 'How far the piano-key spectrum reaches across the view.',
-  wfKeySide: 'Grow the piano-key spectrum from the keys or from the right edge.',
-  noteH: 'How tall each note bar is compared with its row.',
-  round: 'How round the note corners are.',
-  outline: 'Thickness of the edge around each note.',
-  dim: 'How much notes fade once they have been sung.',
-  rows: 'Shade alternate rows like piano keys.',
-  rowTint: 'Color each pitch class (C, D, E, ...) in styles that have it.',
-  window: 'How many seconds of music are on screen at once. Shortcuts: + and -.',
-  playPos: 'Where the playhead sits across the view.',
-  pad: 'Extra rows above and below the highest and lowest notes.',
-  gridDiv: 'How finely the vertical grid is cut.',
-  follow: 'Moves the view up and down to keep the notes on screen.',
-  followSens: 'How far the notes have to move before the view follows.',
-  followRows: 'How many rows stay visible while following.',
-  keys: 'Show the piano keys on the left.',
-  grid: 'Show the vertical grid lines.'
+  highlight: 'Brighten the note being sung.',
+  flash: 'Flash when a note starts.',
+  progress: 'Fill notes as they play.',
+  glow: 'Soft light on notes and pitch. 0 is flat.',
+  sparks: 'Sparks on each new note.',
+  pulse: 'Playhead swells on the beat.',
+  pitch: 'Draw the pitch curve over the notes.',
+  pitchMode: 'How the curve appears.',
+  pitchColor: 'Theme color, track tint, or track color.',
+  lineGap: 'Notes closer than this share one line. 0 breaks at every gap.',
+  trail: 'How long the trail lasts.',
+  head: 'Dot where the line meets the playhead.',
+  bend: 'Semitones for a full bend, MIDI only. Applies to files added after.',
+  lyricMode: 'Lyric inside or above the note.',
+  lyFont: 'System fonts, so they vary by computer.',
+  lyColor: 'Auto picks black or white per note.',
+  lyOut: 'Edge around letters. Helps on busy backgrounds.',
+  lyrPos: 'Corner for the lyric box.',
+  lyrKaraoke: 'Words change color as sung.',
+  lbUnsung: 'Lower is fainter.',
+  lyrBox: 'Panel behind the text.',
+  lyrNext: 'Upcoming line in small type.',
+  lyrRoll: 'Also use per-note lyric edits on the roll.',
+  lbFont: 'System fonts, so they vary by computer.',
+  lbSec: 'Romaji or typed line, relative to the main line.',
+  lbColor: 'Color before a word is sung.',
+  lbLit: 'Color after a word is sung.',
+  lbShadow: 'Always on when the panel is off.',
+  lbPanelA: '0 hides the panel, 100 is solid.',
+  portShow: 'Character image behind the notes.',
+  portSize: 'Share of the video height.',
+  portReact: 'Brighter while the track sings.',
+  bgDim: 'Darken the background.',
+  wfStyle: 'Visualizer from your audio.',
+  wfGain: 'How strongly it reacts.',
+  wfOver: 'Draw on top of the notes.',
+  lsOn: 'Show the mouth image for the vowel sung.',
+  lsPos: 'Several characters share the width.',
+  lsHold: 'Keeps the last vowel so quick notes do not flicker.',
+  lsFade: '0 switches instantly.',
+  lsPop: 'Swells slightly on each note.',
+  utauClean: 'Show only the sung syllable, hiding VCV and CVVC parts, breaths and arrows. UST and USTX only.',
+  pvQ: 'Preview sharpness only. Videos use the full size.',
+  pvFps: 'Preview only.',
+  pvLite: 'No glow in the preview. Video keeps it.',
+  noteH: 'Note height within its row.',
+  dim: 'Fade after a note is sung.',
+  rows: 'Alternate row shading.',
+  rowTint: 'Color each pitch class, in styles that have it.',
+  window: 'Seconds on screen. Keys: + and -.',
+  playPos: 'Playhead position.',
+  pad: 'Extra rows above and below.',
+  gridDiv: 'Grid detail.',
+  follow: 'Scroll to keep notes in view.',
+  followSens: 'Notes to move before following.',
+  followRows: 'Rows visible while following.'
 };
 // hints for fixed parts of the page, by selector
 const STATIC_TIPS = [
-  ['#btnProj', 'Add vocal synth project files. UST files can be layered together; other formats replace the one that is loaded.'],
-  ['#btnAudio', 'Add the song audio. It plays with the roll, goes into the exported video and drives the visualizer.'],
-  ['#btnTheme', 'Switch the app between automatic, light and dark. This does not change the piano roll’s look.'],
-  ['#btnHelp', 'Keyboard shortcuts (?)'],
-  ['#btnTips', 'Turn these hover hints on or off.'],
-  ['#btnExport', 'Go to the Export tab to record a video.'],
-  ['#rzL', 'Drag to resize the left sidebar. Double-click to reset.'],
-  ['#rzT', 'Drag to resize the timeline. Double-click to reset.'],
-  ['#rzR', 'Drag to resize the right sidebar. Double-click to reset.'],
-  ['.tabs [data-tab=proj]', 'Files, tracks, portraits, background, lyric box and the settings you reach for most. Key: 1'],
-  ['.tabs [data-tab=fx]', 'Every effect and text option. Key: 2'],
-  ['.tabs [data-tab=look]', 'Themes, colors, theme files and the video frame. Key: 3'],
-  ['.tabs [data-tab=ls]', 'Mouth images that follow the vowel being sung. Key: 4'],
-  ['.tabs [data-tab=exp]', 'Record a video or render a queue of songs. Key: 5'],
-  ['#tlBody', 'Click to move the playhead. Drag the audio lane to slide the audio (it snaps to beats and notes; hold Alt to move freely). Shift-drag sets a loop.'],
-  ['#toStart', 'Back to the start. Key: Home'],
+  ['#btnProj', 'Add project files. Only UST files layer; others replace.'],
+  ['#btnAudio', 'Add the song audio.'],
+  ['#btnTheme', 'App theme only.'],
+  ['#btnTips', 'Hover hints on or off.'],
+  ['#btnExport', 'Go to Export.'],
+  ['#rzL', 'Drag to resize. Double-click resets.'],
+  ['#rzT', 'Drag to resize. Double-click resets.'],
+  ['#rzR', 'Drag to resize. Double-click resets.'],
+  ['.tabs [data-tab=proj]', 'Files, tracks and common settings. Key: 1'],
+  ['.tabs [data-tab=fx]', 'All effects. Key: 2'],
+  ['.tabs [data-tab=look]', 'Themes, colors and frame. Key: 3'],
+  ['.tabs [data-tab=ls]', 'Mouth images by vowel. Key: 4'],
+  ['.tabs [data-tab=exp]', 'Render video. Key: 5'],
+  ['#tlBody', 'Click to seek. Drag the audio lane to slide it (Alt: free). Shift-drag loops.'],
+  ['#toStart', 'Start. Key: Home'],
   ['#play', 'Play or pause. Key: Space'],
-  ['#tlZoom', 'Zoom the timeline. Shift-drag on the timeline to set a loop.'],
-  ['label[for=autoStyle]', 'When on, loading a file switches to the style of the program that made it.'],
-  ['#shade', 'Dark or light version of the piano roll. Only available for character themes.'],
-  ['#applyPal', 'Give every track a color from the palette again, undoing colors you picked by hand.'],
-  ['#resetColors', 'Back to the colors of the chosen theme.'],
-  ['#saveMine', 'Keep the current look as “My theme” in this browser.'],
-  ['#size', 'Resolution of the preview and the exported video.'],
-  ['#caption', 'A title shown in the top left of the video.'],
-  ['#themeName', 'Name stored inside the theme file.'],
-  ['#themeSave', 'Save the colors and effects as a small file you can share.'],
-  ['#themeLoad', 'Add a theme file someone sent you.'],
-  ['#themeRemove', 'Delete this theme from your list.'],
-  ['label[for=portShow]', 'Show a character image behind the notes. Opacity and size are in Effects.'],
-  ['#lyrSrc', 'Where the lyric box gets its text: the notes, or text you type.'],
-  ['#lyrTrack', 'Which track the lyric box follows.'],
-  ['#lyrText', 'One line per phrase. Start a line with [mm:ss.xx] to time it exactly.'],
-  ['#lyrFile', 'Load lyrics from a .txt or .lrc file.'],
-  ['#lyrClear', 'Empty the text box.'],
-  ['#lyr2', 'A second line under the lyrics, such as romaji or a translation.'],
-  ['label[for=lyrShow]', 'Show the lyric box on the video. Key: L'],
-  ['#bgMode', 'Normal, transparent (WebM with alpha) or green screen for editing software.'],
-  ['#aspect', 'Shape of the video.'],
-  ['#expFrom', 'Start the recording here instead of at the beginning.'],
-  ['#expTo', 'End the recording here instead of at the end.'],
-  ['#fps', 'Frames per second of the recording.'],
-  ['#mbps', 'Higher quality makes a bigger file.'],
-  ['#method', 'Exact frames draws and saves every frame itself, so the video has exactly the frame rate you chose even on a slow computer. Live recording captures the screen as it plays and can drop frames.'],
-  ['#autoMp4', 'After recording, convert WebM to MP4 or write the length into the file, inside the page. Slower on long videos.'],
-  ['#rngAll', 'Clear both boxes so the whole project is recorded.'],
-  ['#resMp4', 'Convert this recording to an H.264 MP4 that plays everywhere. Runs on your computer.'],
-  ['#resFix', 'Rewrite the file so players show its length and can skip through it. No re-encoding, so it is quick.'],
-  ['#rec', 'Plays the project once in real time and records it. Keep this tab open until it finishes.'],
-  ['label[for=qCaption]', 'Put each file’s name in the top left of its video.'],
-  ['#qAdd', 'Add project files, and audio files with the same names, to render in one go.'],
-  ['#qRun', 'Render every file in the list one after another with the current look.'],
+  ['#tlZoom', 'Zoom the timeline.'],
+  ['label[for=autoStyle]', 'Use the style of the file\u2019s program.'],
+  ['#shade', 'Character themes only.'],
+  ['#applyPal', 'Reset track colors to the palette.'],
+  ['#resetColors', 'Back to the theme colors.'],
+  ['#saveMine', 'Keep this look as My theme.'],
+  ['#size', 'Preview and video resolution.'],
+  ['#caption', 'Title in the top left.'],
+  ['#themeName', 'Name inside the theme file.'],
+  ['#themeSave', 'Save a shareable theme file.'],
+  ['#themeLoad', 'Add a theme file.'],
+  ['#themeRemove', 'Delete this theme.'],
+  ['label[for=portShow]', 'Opacity and size are in Effects.'],
+  ['#lyrSrc', 'Notes, or text you type.'],
+  ['#lyrText', 'One line per phrase. Start with [mm:ss.xx] to time it.'],
+  ['#lyr2', 'Romaji or a translation.'],
+  ['label[for=lyrShow]', 'Key: L'],
+  ['#bgMode', 'Transparent (alpha) or green screen, for editing software.'],
+  ['#expFrom', 'Start here.'],
+  ['#expTo', 'End here.'],
+  ['#mbps', 'Higher is a bigger file.'],
+  ['#method', 'Exact draws every frame, so the frame rate is true even on slow computers. Live records the screen and can drop frames.'],
+  ['#autoMp4', 'Convert WebM to MP4, or add the length, after recording.'],
+  ['#rngAll', 'Clear the range.'],
+  ['#resMp4', 'Convert to a MP4 that plays anywhere.'],
+  ['#resFix', 'Add the length so players can skip. Quick.'],
+  ['#rec', 'Keep this tab open until it finishes.'],
+  ['label[for=qCaption]', 'File name in the top left.'],
+  ['#qAdd', 'Add projects, and audio with the same names.'],
+  ['#qRun', 'Render the list one by one.'],
   ['#qClear', 'Empty the list.']
 ];
 // state
 const FXDEF = [
   { sec: 'Playback' },
-  { k: 'highlight', t: 'toggle', l: 'Highlight the sounding note' },
-  { k: 'flash', t: 'toggle', l: 'Flash at note onset' },
-  { k: 'progress', t: 'toggle', l: 'Fill the note as it plays' },
+  { k: 'highlight', t: 'toggle', l: 'Highlight note' },
+  { k: 'flash', t: 'toggle', l: 'Flash on start' },
+  { k: 'progress', t: 'toggle', l: 'Fill progress' },
   { k: 'glow', t: 'range', l: 'Glow', min: 0, max: 40, step: 1, u: 'px' },
-  { k: 'glowColor', t: 'select', l: 'Glow color', opts: [['track', 'Track color'], ['hi', 'Highlight color'], ['white', 'White']] },
-  { k: 'sparks', t: 'toggle', l: 'Sparks at the playhead' },
-  { k: 'pulse', t: 'toggle', l: 'Pulse the playhead on the beat' },
+  { k: 'glowColor', t: 'select', l: 'Glow color', opts: [['track', 'Track'], ['hi', 'Highlight'], ['white', 'White']] },
+  { k: 'sparks', t: 'toggle', l: 'Playhead sparks' },
+  { k: 'pulse', t: 'toggle', l: 'Beat pulse' },
   { sec: 'Pitch curve' },
-  { k: 'pitch', t: 'toggle', l: 'Draw pitch onto notes' },
-  { k: 'pitchMode', t: 'select', l: 'Drawing style', opts: [['reveal', 'Reveal as it plays'], ['always', 'Full curve, traced bright'], ['static', 'Full curve, always visible'], ['trail', 'Fading trail']] },
-  { k: 'pitchColor', t: 'select', l: 'Curve color', opts: [['theme', 'Theme pitch color'], ['tint', 'Tinted track color'], ['track', 'Track color']] },
+  { k: 'pitch', t: 'toggle', l: 'Draw pitch' },
+  { k: 'pitchMode', t: 'select', l: 'Style', opts: [['reveal', 'Reveal'], ['always', 'Traced'], ['static', 'Full curve'], ['trail', 'Trail']] },
+  { k: 'pitchColor', t: 'select', l: 'Curve color', opts: [['theme', 'Theme'], ['tint', 'Tinted'], ['track', 'Track']] },
   { k: 'pitchW', t: 'range', l: 'Line width', min: 1, max: 10, step: 0.5, u: 'px' },
-  { k: 'lineGap', t: 'range', l: 'Join notes closer than', min: 0, max: 1.5, step: 0.05, u: 's' },
+  { k: 'lineGap', t: 'range', l: 'Join gap', min: 0, max: 1.5, step: 0.05, u: 's' },
   { k: 'trail', t: 'range', l: 'Trail length', min: 0.2, max: 4, step: 0.1, u: 's' },
-  { k: 'head', t: 'toggle', l: 'Dot at the pitch head' },
-  { k: 'bend', t: 'range', l: 'MIDI bend range', min: 1, max: 24, step: 1, u: 'st', reload: true },
-  { sec: 'Lyrics on the notes' },
+  { k: 'head', t: 'toggle', l: 'Head dot' },
+  { k: 'bend', t: 'range', l: 'Bend range', min: 1, max: 24, step: 1, u: 'st', reload: true },
+  { sec: 'Note lyrics' },
   { k: 'lyrics', t: 'toggle', l: 'Show lyrics' },
-  { k: 'utauClean', t: 'toggle', l: 'UTAU files: show only the sung syllable (hide VCV and CVVC parts, breaths and symbols)' },
-  { k: 'lyricMode', t: 'select', l: 'Placement', opts: [['auto', 'Inside, above when too narrow'], ['inside', 'Inside notes'], ['above', 'Above notes']] },
+  { k: 'utauClean', t: 'toggle', l: 'Clean UTAU lyrics' },
+  { k: 'lyricMode', t: 'select', l: 'Placement', opts: [['auto', 'Auto'], ['inside', 'Inside'], ['above', 'Above']] },
   { k: 'lyricSize', t: 'range', l: 'Lyric size', min: 50, max: 180, step: 5, u: '%' },
   { k: 'lyFont', t: 'select', l: 'Font', opts: FONT_OPTS },
-  { k: 'lyWeight', t: 'select', l: 'Weight', opts: [['auto', 'Automatic (bolder while sounding)'], ...WEIGHTS] },
+  { k: 'lyWeight', t: 'select', l: 'Weight', opts: [['auto', 'Auto'], ...WEIGHTS] },
   { k: 'lyItalic', t: 'toggle', l: 'Italic' },
-  { k: 'lyCase', t: 'select', l: 'Letter case', opts: CASES },
-  { k: 'lySpacing', t: 'range', l: 'Letter spacing', min: -1, max: 8, step: 0.5, u: ' px' },
-  { k: 'lyColor', t: 'select', l: 'Text color', opts: [['auto', 'Automatic contrast'], ['theme', 'Theme text color'], ['custom', 'Custom color']] },
-  { k: 'lyColorC', t: 'color', l: 'Custom text color', when: ['lyColor', 'custom'] },
+  { k: 'lyCase', t: 'select', l: 'Case', opts: CASES },
+  { k: 'lySpacing', t: 'range', l: 'Spacing', min: -1, max: 8, step: 0.5, u: ' px' },
+  { k: 'lyColor', t: 'select', l: 'Text color', opts: [['auto', 'Auto'], ['theme', 'Theme'], ['custom', 'Custom']] },
+  { k: 'lyColorC', t: 'color', l: 'Custom color', when: ['lyColor', 'custom'] },
   { k: 'lyOut', t: 'range', l: 'Outline', min: 0, max: 6, step: 0.5, u: ' px' },
-  { k: 'lyShadow', t: 'toggle', l: 'Drop shadow' },
+  { k: 'lyShadow', t: 'toggle', l: 'Shadow' },
   { sec: 'Lyric box' },
   { k: 'lyrPos', t: 'select', l: 'Corner', opts: [['br', 'Bottom right'], ['bl', 'Bottom left'], ['bc', 'Bottom center'], ['tr', 'Top right'], ['tl', 'Top left']] },
   { k: 'lyrSize', t: 'range', l: 'Size', min: 50, max: 220, step: 5, u: '%' },
-  { k: 'lyrKaraoke', t: 'toggle', l: 'Highlight each word as it is sung' },
-  { k: 'lbKStyle', t: 'select', l: 'Karaoke style', opts: [['switch', 'Color changes when sung'], ['sweep', 'Color sweeps across the word'], ['underline', 'Color change with underline'], ['pop', 'Sung word grows briefly']], when: ['lyrKaraoke', true] },
-  { k: 'lbUnsung', t: 'range', l: 'Words not yet sung', min: 20, max: 100, step: 1, u: '%', when: ['lyrKaraoke', true] },
-  { k: 'lyrBox', t: 'toggle', l: 'Panel behind the text' },
-  { k: 'lyrNext', t: 'toggle', l: 'Show the next line underneath' },
-  { k: 'lyrRoll', t: 'toggle', l: 'Show per-note edits on the roll too' },
-  { sec: 'Lyric box text' },
+  { k: 'lyrKaraoke', t: 'toggle', l: 'Karaoke' },
+  { k: 'lbKStyle', t: 'select', l: 'Karaoke style', opts: [['switch', 'Color change'], ['sweep', 'Sweep'], ['underline', 'Underline'], ['pop', 'Pop']], when: ['lyrKaraoke', true] },
+  { k: 'lbUnsung', t: 'range', l: 'Unsung opacity', min: 20, max: 100, step: 1, u: '%', when: ['lyrKaraoke', true] },
+  { k: 'lyrBox', t: 'toggle', l: 'Panel' },
+  { k: 'lyrNext', t: 'toggle', l: 'Next line' },
+  { k: 'lyrRoll', t: 'toggle', l: 'Edits on roll' },
   { k: 'lbFont', t: 'select', l: 'Font', opts: FONT_OPTS },
   { k: 'lbWeight', t: 'select', l: 'Weight', opts: WEIGHTS },
   { k: 'lbItalic', t: 'toggle', l: 'Italic' },
-  { k: 'lbCase', t: 'select', l: 'Letter case', opts: CASES },
-  { k: 'lbSpacing', t: 'range', l: 'Letter spacing', min: -1, max: 8, step: 0.5, u: ' px' },
-  { k: 'lbAlign', t: 'select', l: 'Alignment', opts: [['left', 'Left'], ['center', 'Centered'], ['right', 'Right']] },
+  { k: 'lbCase', t: 'select', l: 'Case', opts: CASES },
+  { k: 'lbSpacing', t: 'range', l: 'Spacing', min: -1, max: 8, step: 0.5, u: ' px' },
+  { k: 'lbAlign', t: 'select', l: 'Align', opts: [['left', 'Left'], ['center', 'Centered'], ['right', 'Right']] },
   { k: 'lbLine', t: 'range', l: 'Line height', min: 100, max: 200, step: 5, u: '%' },
-  { k: 'lbSec', t: 'range', l: 'Second line size (romaji or typed)', min: 40, max: 100, step: 1, u: '%' },
-  { k: 'lbColor', t: 'select', l: 'Text color', opts: [['theme', 'Theme text color'], ['custom', 'Custom color']] },
-  { k: 'lbColorC', t: 'color', l: 'Custom text color', when: ['lbColor', 'custom'] },
-  { k: 'lbLit', t: 'select', l: 'Sung word color', opts: [['theme', 'Theme highlight'], ['track', 'Color of the lyric track'], ['custom', 'Custom color']] },
-  { k: 'lbLitC', t: 'color', l: 'Custom sung word color', when: ['lbLit', 'custom'] },
+  { k: 'lbSec', t: 'range', l: 'Second line size', min: 40, max: 100, step: 1, u: '%' },
+  { k: 'lbColor', t: 'select', l: 'Text color', opts: [['theme', 'Theme'], ['custom', 'Custom']] },
+  { k: 'lbColorC', t: 'color', l: 'Custom color', when: ['lbColor', 'custom'] },
+  { k: 'lbLit', t: 'select', l: 'Sung color', opts: [['theme', 'Theme'], ['track', 'Track'], ['custom', 'Custom']] },
+  { k: 'lbLitC', t: 'color', l: 'Custom sung', when: ['lbLit', 'custom'] },
   { k: 'lbOut', t: 'range', l: 'Outline', min: 0, max: 6, step: 0.5, u: ' px' },
-  { k: 'lbShadow', t: 'toggle', l: 'Drop shadow' },
-  { sec: 'Lyric box panel' },
-  { k: 'lbPanel', t: 'select', l: 'Panel color', opts: [['theme', 'Theme background'], ['black', 'Black'], ['white', 'White'], ['custom', 'Custom color']] },
+  { k: 'lbShadow', t: 'toggle', l: 'Shadow' },
+  { k: 'lbPanel', t: 'select', l: 'Panel color', opts: [['theme', 'Theme'], ['black', 'Black'], ['white', 'White'], ['custom', 'Custom']] },
   { k: 'lbPanelC', t: 'color', l: 'Custom panel color', when: ['lbPanel', 'custom'] },
   { k: 'lbPanelA', t: 'range', l: 'Panel opacity', min: 0, max: 100, step: 1, u: '%' },
-  { k: 'lbRadius', t: 'range', l: 'Corner rounding', min: 0, max: 40, step: 1, u: ' px' },
+  { k: 'lbRadius', t: 'range', l: 'Rounding', min: 0, max: 40, step: 1, u: ' px' },
   { k: 'lbPad', t: 'range', l: 'Padding', min: 40, max: 220, step: 5, u: '%' },
-  { ls: true, k: 'lsOn', t: 'toggle', l: 'Lip sync on' },
+  { ls: true, k: 'lsOn', t: 'toggle', l: 'Lip sync' },
   { ls: true, k: 'lsSize', t: 'range', l: 'Size', min: 30, max: 150, step: 1, u: '%' },
   { ls: true, k: 'lsPos', t: 'select', l: 'Position', opts: [['l', 'Left'], ['c', 'Center'], ['r', 'Right']] },
   { ls: true, k: 'lsOpacity', t: 'range', l: 'Opacity', min: 10, max: 100, step: 1, u: '%' },
-  { ls: true, k: 'lsHold', t: 'range', l: 'Keep the mouth open after a note ends', min: 0, max: 300, step: 10, u: ' ms' },
-  { ls: true, k: 'lsFade', t: 'range', l: 'Blend between images', min: 0, max: 150, step: 5, u: ' ms' },
-  { ls: true, k: 'lsPop', t: 'range', l: 'Small pop on every note', min: 0, max: 20, step: 1, u: '%' },
-  { sec: 'Preview speed' },
-  { k: 'pvQ', t: 'select', l: 'Preview quality', opts: [['auto', 'Automatic (match the screen, step down if slow)'], ['1', 'Full (same as the video size)'], ['0.75', '75%'], ['0.5', '50%'], ['0.33', '33%']] },
-  { k: 'pvFps', t: 'select', l: 'Preview frame rate', opts: [['max', 'As fast as the screen'], ['30', '30 fps (lighter)']] },
-  { k: 'pvLite', t: 'toggle', l: 'Lighter effects in the preview (no glow)' },
-  { sec: 'Portraits' },
-  { k: 'portShow', t: 'toggle', l: 'Show portraits' },
+  { ls: true, k: 'lsHold', t: 'range', l: 'Hold mouth', min: 0, max: 300, step: 10, u: ' ms' },
+  { ls: true, k: 'lsFade', t: 'range', l: 'Blend', min: 0, max: 150, step: 5, u: ' ms' },
+  { ls: true, k: 'lsPop', t: 'range', l: 'Note pop', min: 0, max: 20, step: 1, u: '%' },
+  { sec: 'Images' },
+  { k: 'portShow', t: 'toggle', l: 'Portraits' },
   { k: 'portOpacity', t: 'range', l: 'Opacity', min: 5, max: 100, step: 1, u: '%' },
-  { k: 'portSize', t: 'range', l: 'Size (percent of the video height)', min: 30, max: 140, step: 1, u: '%' },
+  { k: 'portSize', t: 'range', l: 'Size', min: 30, max: 140, step: 1, u: '%' },
   { k: 'portPos', t: 'select', l: 'Position', opts: [['r', 'Right'], ['c', 'Center'], ['l', 'Left']] },
-  { k: 'portReact', t: 'toggle', l: 'Brighten while the track sings' },
-  { sec: 'Background' },
+  { k: 'portReact', t: 'toggle', l: 'Brighten on sing' },
   { k: 'bgDim', t: 'range', l: 'Dim', min: 0, max: 95, step: 1, u: '%' },
   { k: 'bgBlur', t: 'range', l: 'Blur', min: 0, max: 24, step: 1, u: 'px' },
   { sec: 'Audio visualizer' },
-  { hint: 'Uses the audio you add in the Editor tab. Nothing is drawn without audio.' },
-  { k: 'wfStyle', t: 'select', l: 'Style (one at a time)', opts: [['off', 'Off'], ['scope', 'Scope line'], ['bars', 'Spectrum bars'], ['keys', 'Piano-key spectrum']] },
-  { k: 'wfColor', show: 'any', t: 'select', l: 'Colors', opts: [['theme', 'Theme palette'], ['custom', 'Custom colors']] },
-  { k: 'wfColA', show: 'any', t: 'color', l: 'Custom color 1 (lines, low end)' },
-  { k: 'wfColB', show: 'any', t: 'color', l: 'Custom color 2 (peaks, tops)' },
+  { hint: 'Needs audio.' },
+  { k: 'wfStyle', t: 'select', l: 'Style', opts: [['off', 'Off'], ['scope', 'Scope'], ['bars', 'Bars'], ['keys', 'Keys']] },
+  { k: 'wfColor', show: 'any', t: 'select', l: 'Colors', opts: [['theme', 'Theme'], ['custom', 'Custom']] },
+  { k: 'wfColA', show: 'any', t: 'color', l: 'Color 1' },
+  { k: 'wfColB', show: 'any', t: 'color', l: 'Color 2' },
   { k: 'wfOpacity', show: 'any', t: 'range', l: 'Opacity', min: 10, max: 100, step: 1, u: '%' },
   { k: 'wfGain', show: 'any', t: 'range', l: 'Sensitivity', min: 25, max: 300, step: 5, u: '%' },
-  { k: 'wfOver', show: 'any', t: 'toggle', l: 'Draw over the notes (otherwise under them)' },
+  { k: 'wfOver', show: 'any', t: 'toggle', l: 'Draw over notes' },
   { k: 'wfW', show: 'any', t: 'range', l: 'Width', min: 10, max: 100, step: 1, u: '%' },
   { k: 'wfH', show: 'scope,bars', t: 'range', l: 'Height', min: 10, max: 100, step: 1, u: '%' },
-  { k: 'wfPX', show: 'any', t: 'range', l: 'Horizontal position (left to right)', min: 0, max: 100, step: 1, u: '%' },
-  { k: 'wfPY', show: 'scope,bars', t: 'range', l: 'Vertical position (top to bottom)', min: 0, max: 100, step: 1, u: '%' },
-  { k: 'wfScopeW', show: 'scope', t: 'range', l: 'Scope line width', min: 1, max: 10, step: 0.5, u: 'px' },
-  { k: 'wfScopeY', show: 'scope', t: 'range', l: 'Scope height in the view', min: 10, max: 90, step: 1, u: '%' },
+  { k: 'wfPX', show: 'any', t: 'range', l: 'X position', min: 0, max: 100, step: 1, u: '%' },
+  { k: 'wfPY', show: 'scope,bars', t: 'range', l: 'Y position', min: 0, max: 100, step: 1, u: '%' },
+  { k: 'wfScopeW', show: 'scope', t: 'range', l: 'Line width', min: 1, max: 10, step: 0.5, u: 'px' },
+  { k: 'wfScopeY', show: 'scope', t: 'range', l: 'Scope height', min: 10, max: 90, step: 1, u: '%' },
   { k: 'wfBarN', show: 'bars', t: 'range', l: 'Bar count', min: 16, max: 128, step: 8, u: '' },
   { k: 'wfBarH', show: 'bars', t: 'range', l: 'Bar height', min: 10, max: 100, step: 1, u: '%' },
-  { k: 'wfBarPos', show: 'bars', t: 'select', l: 'Bar position', opts: [['bottom', 'Bottom'], ['top', 'Top'], ['center', 'Mirrored from the middle']] },
-  { k: 'wfKeyLen', show: 'keys', t: 'range', l: 'Piano-key spectrum length', min: 10, max: 100, step: 1, u: '%' },
-  { k: 'wfKeySide', show: 'keys', t: 'select', l: 'Piano-key spectrum side', opts: [['left', 'From the keys'], ['right', 'From the right edge']] },
-  { sec: 'Notes and rows' },
-  { k: 'noteH', t: 'range', l: 'Note height', min: 40, max: 100, step: 1, u: '%' },
-  { k: 'round', t: 'range', l: 'Corner rounding', min: 0, max: 50, step: 1, u: '%' },
-  { k: 'outline', t: 'range', l: 'Note outline', min: 0, max: 4, step: 0.5, u: 'px' },
-  { k: 'dim', t: 'range', l: 'Dim played notes', min: 0, max: 90, step: 1, u: '%' },
-  { k: 'rows', t: 'toggle', l: 'Row shading' },
-  { k: 'rowTint', t: 'toggle', l: 'Pitch-class row tints (if the style has them)' },
+  { k: 'wfBarPos', show: 'bars', t: 'select', l: 'Bar position', opts: [['bottom', 'Bottom'], ['top', 'Top'], ['center', 'Mirrored']] },
+  { k: 'wfKeyLen', show: 'keys', t: 'range', l: 'Key length', min: 10, max: 100, step: 1, u: '%' },
+  { k: 'wfKeySide', show: 'keys', t: 'select', l: 'Key side', opts: [['left', 'Keys'], ['right', 'Right edge']] },
   { sec: 'View' },
+  { k: 'noteH', t: 'range', l: 'Note height', min: 40, max: 100, step: 1, u: '%' },
+  { k: 'round', t: 'range', l: 'Rounding', min: 0, max: 50, step: 1, u: '%' },
+  { k: 'outline', t: 'range', l: 'Note outline', min: 0, max: 4, step: 0.5, u: 'px' },
+  { k: 'dim', t: 'range', l: 'Dim played', min: 0, max: 90, step: 1, u: '%' },
+  { k: 'rows', t: 'toggle', l: 'Row shading' },
+  { k: 'rowTint', t: 'toggle', l: 'Row tints' },
   { k: 'window', t: 'range', l: 'Time window', min: 2, max: 24, step: 0.5, u: 's' },
   { k: 'playPos', t: 'range', l: 'Playhead position', min: 5, max: 70, step: 1, u: '%' },
   { k: 'pad', t: 'range', l: 'Pitch padding', min: 0, max: 12, step: 1, u: 'st' },
-  { k: 'gridDiv', t: 'select', l: 'Grid subdivision', opts: [['auto', 'Auto by zoom'], ['1', 'Beats'], ['2', '8th notes'], ['4', '16th notes']] },
-  { k: 'follow', t: 'toggle', l: 'Auto-shift the view up and down with the notes' },
-  { k: 'followSens', t: 'range', l: 'Shift sensitivity (notes to move before shifting)', min: 1, max: 12, step: 1, u: ' st' },
-  { k: 'followRows', t: 'range', l: 'Visible range when following', min: 12, max: 48, step: 1, u: ' st' },
+  { k: 'gridDiv', t: 'select', l: 'Grid', opts: [['auto', 'Auto'], ['1', 'Beats'], ['2', '8th notes'], ['4', '16th notes']] },
+  { k: 'follow', t: 'toggle', l: 'Follow notes' },
+  { k: 'followSens', t: 'range', l: 'Follow sensitivity', min: 1, max: 12, step: 1, u: ' st' },
+  { k: 'followRows', t: 'range', l: 'Follow range', min: 12, max: 48, step: 1, u: ' st' },
   { k: 'keys', t: 'toggle', l: 'Piano keys' },
-  { k: 'grid', t: 'toggle', l: 'Grid lines' }
+  { k: 'grid', t: 'toggle', l: 'Grid lines' },
+  { k: 'pvQ', t: 'select', l: 'Quality', opts: [['auto', 'Auto'], ['1', 'Full'], ['0.75', '75%'], ['0.5', '50%'], ['0.33', '33%']] },
+  { k: 'pvFps', t: 'select', l: 'Frame rate', opts: [['max', 'Max'], ['30', '30 fps']] },
+  { k: 'pvLite', t: 'toggle', l: 'Light preview' }
 ];
 const FX0 = { wfStyle: 'off', wfW: 100, wfH: 100, wfPX: 50, wfPY: 50, wfColor: 'theme', wfColA: '#39c5bb', wfColB: '#ff6fae', wfOpacity: 60, wfGain: 100, wfOver: false, wfScopeW: 2.5, wfScopeY: 50, wfBarN: 64, wfBarH: 55, wfBarPos: 'bottom', wfKeyLen: 55, wfKeySide: 'left', highlight: true, flash: true, progress: true, glow: 14, glowColor: 'track', sparks: true, pulse: false, pitch: true, pitchMode: 'reveal', pitchColor: 'theme', pitchW: 3, lineGap: 0.35, trail: 1.4, head: true, bend: 2, lyrics: true, lyricMode: 'auto', lyricSize: 100, noteH: 78, round: 20, outline: 0, dim: 45, rows: true, rowTint: true, window: 6, playPos: 25, pad: 3, gridDiv: 'auto', follow: false, followSens: 3, followRows: 24, keys: true, grid: true, lyrShow: false, lyrSrc: 'notes', lyrPos: 'br', lyrSize: 100, lyrKaraoke: true, lyrBox: true, lyrNext: false, portShow: false, portPos: 'r', portSize: 90, portOpacity: 30, portReact: true, bgDim: 40, bgBlur: 0, lyr2: 'off', lyFont: 'sans', lyWeight: 'auto', lyItalic: false, lyCase: 'asis', lySpacing: 0, lyColor: 'auto', lyColorC: '#ffffff', lyOut: 0, lyShadow: false, lyrRoll: false, lbFont: 'sans', lbWeight: '650', lbItalic: false, lbCase: 'asis', lbSpacing: 0, lbAlign: 'left', lbLine: 130, lbSec: 62, lbColor: 'theme', lbColorC: '#ffffff', lbLit: 'theme', lbLitC: '#ffd54a', lbOut: 0, lbShadow: false, lbPanel: 'theme', lbPanelC: '#000000', lbPanelA: 80, lbRadius: 14, lbPad: 100, lbKStyle: 'switch', lbUnsung: 62, pvQ: 'auto', pvFps: 'max', pvLite: false, utauClean: true, lsOn: false, lsSize: 90, lsPos: 'r', lsOpacity: 100, lsHold: 60, lsFade: 0, lsPop: 0 };
 const STYLEKEYS = ['highlight', 'flash', 'progress', 'glow', 'glowColor', 'sparks', 'pulse', 'pitch', 'pitchMode', 'pitchColor', 'pitchW', 'lineGap', 'trail', 'head', 'noteH', 'round', 'outline', 'dim', 'rows', 'rowTint'];
@@ -488,7 +428,7 @@ function addProject(res, name) {
   S.files.push(f); applyUtauMode();
 }
 // extension wins over the browser's guess: Chrome reports .mid as audio/mid
-const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsq', 'vsqx', 'vpr', 'svp', 'ccs', 'tssln', 'zip', 'ntpj', 'xml', 'musicxml', 'mxl'];
+const PROJ_EXT = ['ustx', 'ust', 'mid', 'midi', 'vsq', 'vsqx', 'vpr', 'vprx', 'svp', 'ccs', 'tssln', 'zip', 'ntpj', 'xml', 'musicxml', 'mxl'];
 async function addFiles(list) {
   const files = Array.from(list), audio = [], proj = [];
   for (const f of files) { const e = f.name.split('.').pop().toLowerCase(); (PROJ_EXT.includes(e) ? proj : (['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aac', 'opus'].includes(e) || f.type.startsWith('audio/') ? audio : proj)).push(f); }
@@ -542,8 +482,8 @@ async function loadAudio(file) {
     const ab = await file.arrayBuffer();
     S.buf = await S.ctx.decodeAudioData(ab); S.bufName = file.name;
     if (S.playing) restartAudio();
-    renderAudio(); msg('Audio loaded: ' + file.name, 'ok');
-  } catch (e) { msg('That audio file could not be decoded. WAV, MP3 and OGG usually work.', 'err'); }
+    renderAudio(); msg('Audio: ' + file.name, 'ok');
+  } catch (e) { msg('Could not read that audio. Try WAV, MP3 or OGG.', 'err'); }
 }
 function stopSrc() { if (S.src) { try { S.src.stop(); } catch (e) {} S.src.disconnect(); S.src = null; } }
 function restartAudio() {
@@ -861,7 +801,7 @@ function draw(T) {
     if (rowH > 9 * sc) for (let p = loI; p <= hiI; p++) if (((p % 12) + 12) % 12 === 0) ctx.fillText('C' + (Math.floor(p / 12) - 1), keysW - 5 * sc, (hi - p + 0.5) * rowH);
     ctx.textAlign = 'left'; ctx.fillStyle = css(gr, 0.5); ctx.fillRect(keysW - 1, 0, 1.5, H);
   }
-  if (!S.files.length) { ctx.font = `600 ${22 * sc}px ${FONT}`; ctx.fillStyle = P.fg; ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Drop project files here', W / 2, H / 2); ctx.textAlign = 'left'; ctx.globalAlpha = 1; }
+  if (!S.files.length) { ctx.font = `600 ${22 * sc}px ${FONT}`; ctx.fillStyle = P.fg; ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Drop files here', W / 2, H / 2); ctx.textAlign = 'left'; ctx.globalAlpha = 1; }
   if (look.caption) { ctx.font = `650 ${22 * sc}px ${FONT}`; ctx.fillStyle = P.fg; ctx.globalAlpha = 0.9; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(look.caption, keysW + 22 * sc, 18 * sc); ctx.globalAlpha = 1; }
   drawLyricBox(W, H, sc, keysW, P, T);
 }
@@ -1106,7 +1046,7 @@ function makeCtl(d, pre) {
   } else if (d.t === 'range') {
     const out = h('output', { for: id }, fx[d.k] + d.u);
     const inp = reg(h('input', { type: 'range', id, min: d.min, max: d.max, step: d.step, value: fx[d.k], oninput: e => { put(parseFloat(e.target.value)); if (d.k === 'pad') recalc(); } }));
-    if (d.reload) inp.addEventListener('change', () => { if (S.files.some(f => f.fmt === 'MIDI')) msg('Bend range applies to MIDI files added from now on.'); });
+    if (d.reload) inp.addEventListener('change', () => { if (S.files.some(f => f.fmt === 'MIDI')) msg('Bend range applies to new MIDI files.'); });
     inp.nextOutput = out; inp.u = d.u;
     el = h('div', { class: 'row r' }, h('label', { for: id }, d.l), out, inp);
   } else {
@@ -1191,7 +1131,7 @@ function syncShade() {
   const has = !!(PRESETS[look.preset] && PRESETS[look.preset].alt);
   document.querySelectorAll('#shade button, .qshade').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === look.shade)); b.disabled = !has; });
   $('#themeRemove').hidden = !look.themes[look.preset];
-  $('#shadeHint').textContent = has ? 'Only changes the piano roll and exported video. The app theme (top right) stays separate.' : 'Light and dark versions are available for the character themes.';
+  $('#shadeHint').textContent = has ? 'Roll and video only, not the app theme.' : 'Character themes only.';
 }
 document.querySelectorAll('#shade button').forEach(b => b.addEventListener('click', () => { look.shade = b.dataset.v; applyPreset(look.preset, look.auto); syncShade(); }));
 $('#autoStyle').addEventListener('change', e => { look.auto = e.target.checked; save(); });
@@ -1226,8 +1166,8 @@ $('#fps').value = look.fps; $('#fps').addEventListener('change', e => { look.fps
 function syncMethod() {
   const ok = exactSupported() && look.bgMode !== 'alpha', exact = look.method !== 'live' && ok;
   $('#method').value = ok ? look.method : 'live'; $('#method').disabled = !ok; $('#rec').textContent = exact ? 'Render video' : 'Record video';
-  $('#methodHint').textContent = exact ? 'Draws every frame at its own moment, so the frame rate is exactly what you set whatever the speed of this computer. It can take longer than the song, and it keeps going if this tab is in the background.'
-    : (look.bgMode === 'alpha' ? 'Transparent video uses live recording. ' : !exactSupported() ? 'This browser cannot render frame by frame (use Chrome, Edge or the Windows app for that), so it records live. ' : '') + 'Recording plays the whole project once in real time and captures the canvas plus any loaded audio. Keep this tab in the foreground until it finishes. A slow computer can drop frames.';
+  $('#methodHint').textContent = exact ? 'True frame rate. Can take longer than the song. Works in the background.'
+    : (look.bgMode === 'alpha' ? 'Transparent uses live. ' : !exactSupported() ? 'No exact render here (use Chrome, Edge or the app). ' : '') + 'Records in real time. Keep this tab open. Slow computers can drop frames.';
 }
 $('#method').addEventListener('change', e => { look.method = e.target.value; save(); syncMethod(); });
 syncMethod();
@@ -1314,7 +1254,7 @@ function syncRange() {
   const to = $('#expTo'); if (!to) return;
   to.placeholder = S.duration.toFixed(1); to.max = S.duration.toFixed(1); $('#expFrom').max = S.duration.toFixed(1);
   const r = exportRange(false);
-  $('#rngInfo').textContent = r.err ? r.err : 'Records ' + fmt(r.from) + ' to ' + fmt(r.to) + ' (' + fmt(r.to - r.from) + ' long).';
+  $('#rngInfo').textContent = r.err ? r.err : fmt(r.from) + ' to ' + fmt(r.to) + ' (' + fmt(r.to - r.from) + ')';
   $('#rngInfo').classList.toggle('err', !!r.err);
 }
 function pickMime(noMp4) {
@@ -1334,10 +1274,10 @@ async function startExport(opts) {
     const r = await renderExact(opts);
     if (r !== undefined) return r;
   }
-  if (S.converting) { msg('Wait for the conversion to finish first.', 'err'); return null; }
+  if (S.converting) { msg('Wait for the conversion.', 'err'); return null; }
   if (S.exporting) return null;
-  if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record the canvas. Try a current Chrome, Edge or Safari.', 'err'); return null; }
-  const mime = pickMime(opts && opts.noMp4); if (!mime) { msg('No supported video recording format was found in this browser.', 'err'); return null; }
+  if (!window.MediaRecorder || !cv.captureStream) { msg('This browser cannot record. Try Chrome, Edge or Safari.', 'err'); return null; }
+  const mime = pickMime(opts && opts.noMp4); if (!mime) { msg('No supported video format here.', 'err'); return null; }
   const whole = !!(opts && opts.whole);
   const rg = exportRange(whole);
   if (rg.err) { msg(rg.err, 'err'); return null; }
@@ -1362,17 +1302,17 @@ async function startExport(opts) {
     if (ex && !ex.cancel && blob.size < 2048) {
       // the recorder produced nothing (it failed to start, or stopped by itself)
       $('#rec').disabled = false;
-      if (type.includes('mp4') && !(opts && opts.noMp4)) { msg('MP4 recording did not work on this computer, trying WebM instead...'); done(await startExport({ ...(opts || {}), noMp4: true })); return; }
-      msg('The recording came out empty. Try a smaller video size or a lower frame rate in the Export tab.', 'err'); done(null); return;
+      if (type.includes('mp4') && !(opts && opts.noMp4)) { msg('MP4 failed, trying WebM...'); done(await startExport({ ...(opts || {}), noMp4: true })); return; }
+      msg('Empty recording. Try a smaller size or lower frame rate.', 'err'); done(null); return;
     }
     let res = ex && !ex.cancel ? { blob, ext: type.includes('mp4') ? 'mp4' : 'webm', len: to - from } : null;
     if (res) {
       showResult(res.blob, res.ext, res.len);
-      if (look.autoMp4 && res.blob.size > 250e6) msg('The recording is large, so it was not repaired automatically. Press Fix length to do it.', 'ok');
+      if (look.autoMp4 && res.blob.size > 250e6) msg('Large file. Press Fix length to repair it.', 'ok');
       else if (look.autoMp4) {
         const kind = res.ext === 'webm' && look.bgMode !== 'alpha' ? 'mp4' : 'fix';
         try { const m = await ffConvert(res.blob, kind, res.len); res = { blob: m, ext: kind === 'mp4' ? 'mp4' : res.ext, len: res.len }; showResult(m, res.ext, res.len, true); }
-        catch (e) { if (e && e.cancelled) msg('Cancelled. The original recording is still here.'); else msg('That did not work (' + (e && e.message || 'error') + '). The original recording is still here.', 'err'); }
+        catch (e) { if (e && e.cancelled) msg('Cancelled. Original kept.'); else msg('Failed (' + (e && e.message || 'error') + '). Original kept.', 'err'); }
       }
     }
     $('#rec').disabled = false;
@@ -1419,7 +1359,7 @@ function bgSeek(T) {
 }
 // resolves with { blob, ext, len }, null when cancelled or failed, and undefined when the live recorder should be used instead
 async function renderExact(opts) {
-  if (S.converting) { msg('Wait for the conversion to finish first.', 'err'); return null; }
+  if (S.converting) { msg('Wait for the conversion.', 'err'); return null; }
   if (S.exporting) return null;
   const rg = exportRange(!!(opts && opts.whole)); if (rg.err) { msg(rg.err, 'err'); return null; }
   if (!(await exactReady())) return undefined;
@@ -1466,29 +1406,29 @@ async function renderExact(opts) {
         last = now;
         const k = n / total, sp = n / ((now - t0) / 1000), eta = (total - n) / Math.max(0.1, sp);
         $('#recBar').style.width = (k * 100).toFixed(1) + '%';
-        $('#recText').textContent = 'Rendering frame ' + n + ' of ' + total + '  (' + sp.toFixed(1) + ' frames/s, about ' + (eta < 90 ? Math.ceil(eta) + ' s' : Math.ceil(eta / 60) + ' min') + ' left)';
+        $('#recText').textContent = 'Frame ' + n + ' of ' + total + ' · ' + sp.toFixed(1) + ' fps · ' + (eta < 90 ? Math.ceil(eta) + ' s' : Math.ceil(eta / 60) + ' min') + ' left';
         while (venc.encodeQueueSize > 12 && !ex.cancel) await new Promise(r => setTimeout(r, 4));
         await yieldUI();
       }
     }
-    if (!ex.cancel) { $('#recText').textContent = 'Finishing the file...'; await venc.flush(); if (aenc) await aenc.flush(); if (err) throw err; muxer.finalize(); }
+    if (!ex.cancel) { $('#recText').textContent = 'Finishing...'; await venc.flush(); if (aenc) await aenc.flush(); if (err) throw err; muxer.finalize(); }
   } catch (e) {
     err = e; ex.cancel = true;
   }
   try { venc.close(); } catch (e) {} try { aenc && aenc.close(); } catch (e) {}
   const cancelled = ex.cancel && !err;
   S.exporting = null; S.rendering = false; S.fullRes = false; S.qDirty = true; $('#recState').hidden = true; $('#rec').disabled = false; seek(from);
-  if (cancelled) { msg('Rendering cancelled.'); return null; }
+  if (cancelled) { msg('Cancelled.'); return null; }
   if (err) { msg('Rendering failed (' + (err.message || err) + '). Switching to live recording.', 'err'); return undefined; }
   const ext = plan.box === 'mp4' ? 'mp4' : 'webm', blob = new Blob([muxer.target.buffer], { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
   showResult(blob, ext, to - from, true);
-  $('#resInfo').textContent += ' Rendered frame by frame at ' + fps + ' fps' + (plan.box === 'webm' ? ' (this browser has no H.264 encoder)' : '') + '.';
+  $('#resInfo').textContent += ' Exact ' + fps + ' fps' + (plan.box === 'webm' ? ' (no H.264 here)' : '') + '.';
   msg('Rendering finished.', 'ok');
   let out = { blob, ext, len: to - from };
   const needFix = ext === 'webm' ? 'mp4' : plan.audio && plan.audio.mux === 'opus' ? 'aac' : '';
   if (needFix && look.autoMp4) {
     try { const m = await ffConvert(blob, needFix, out.len); out = { blob: m, ext: 'mp4', len: out.len }; showResult(m, 'mp4', out.len, true); }
-    catch (e) { if (e && e.cancelled) msg('Cancelled. The unconverted render is still here.'); else msg('That did not work (' + (e && e.message || 'error') + '). The unconverted render is still here.', 'err'); }
+    catch (e) { if (e && e.cancelled) msg('Cancelled. Original kept.'); else msg('Failed (' + (e && e.message || 'error') + '). Original kept.', 'err'); }
   }
   return out;
 }
@@ -1501,7 +1441,7 @@ function showResult(blob, ext, len, fixed) {
   const base = ((S.files[0] || {}).name || 'utaviewer').replace(/\.[^.]+$/, '');
   $('#result').hidden = false;
   const alpha = look.bgMode === 'alpha';
-  $('#resInfo').textContent = (blob.size / 1048576).toFixed(1) + ' MB, ' + ext.toUpperCase() + (ext === 'webm' ? (alpha ? '. Transparent video has to stay WebM.' : '. This browser records WebM. Convert to MP4 for editors, phones and social sites.') : '.') + (fixed ? ' Length is stored in the file.' : ' If your player shows no end time, press Fix length.');
+  $('#resInfo').textContent = (blob.size / 1048576).toFixed(1) + ' MB, ' + ext.toUpperCase() + (ext === 'webm' ? (alpha ? '. Transparent stays WebM.' : '. Convert to MP4 for editors and phones.') : '.') + (fixed ? ' Length stored.' : ' No end time? Press Fix length.');
   $('#resConv').hidden = false; $('#resMp4').hidden = ext !== 'webm' || alpha; $('#resFix').hidden = false;
   const v = $('#resVideo'); v.hidden = true;
   if (lastUrl) URL.revokeObjectURL(lastUrl);
@@ -1583,7 +1523,7 @@ async function resConvert(kind) {
   try {
     const out = await ffConvert(lastBlob, kind, lastLen);
     showResult(out, kind === 'mp4' ? 'mp4' : lastExt, lastLen, true); msg(kind === 'mp4' ? 'Converted to MP4.' : 'The length is fixed.', 'ok');
-  } catch (e) { if (e && e.cancelled) msg('Cancelled.'); else msg('That did not work: ' + (e && e.message || 'error') + '.', 'err'); }
+  } catch (e) { if (e && e.cancelled) msg('Cancelled.'); else msg('Failed: ' + (e && e.message || 'error') + '.', 'err'); }
 }
 $('#resMp4').addEventListener('click', () => resConvert('mp4'));
 $('#resFix').addEventListener('click', () => resConvert('fix'));
@@ -1593,7 +1533,7 @@ $('#resSave').addEventListener('click', async () => {
   if (!lastBlob) return;
   if (!S.dl) { const a = document.createElement('a'); a.href = URL.createObjectURL(lastBlob); a.download = $('#resSave').dataset.name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); msg('Saved.', 'ok'); return; }
   try { await S.dl.save({ filename: $('#resSave').dataset.name, data: lastBlob }); msg('Saved.', 'ok'); }
-  catch (e) { if (e && e.code === 'declined') return; msg('The file could not be saved (' + (e && e.code || 'error') + ').', 'err'); }
+  catch (e) { if (e && e.code === 'declined') return; msg('Could not save (' + (e && e.code || 'error') + ').', 'err'); }
 });
 
 // ---- 1.2: background, portraits, lyric box, look files ----
@@ -1608,8 +1548,8 @@ async function shrink(src, max, type, q) {
   const data = c.toDataURL(type, q); return { data, img: await imgFromSrc(data) };
 }
 async function setPortrait(name, file) {
-  try { const p = await shrink(await readAsDataURL(file), 1024, 'image/png'); S.ports.set(name, p); renderVis(); msg('Portrait set for ' + name + '.' + (fx.portShow ? '' : ' Tick Show portraits to see it.'), 'ok'); }
-  catch (e) { msg('That image could not be read.', 'err'); }
+  try { const p = await shrink(await readAsDataURL(file), 1024, 'image/png'); S.ports.set(name, p); renderVis(); msg('Portrait set for ' + name + '.' + (fx.portShow ? '' : ' Tick Portraits to show it.'), 'ok'); }
+  catch (e) { msg('Could not read that image.', 'err'); }
 }
 function pickPortrait(name) {
   const inp = $('#filePort'); inp.onchange = () => { if (inp.files[0]) setPortrait(name, inp.files[0]); inp.value = ''; }; inp.click();
@@ -1629,7 +1569,7 @@ async function setBg(file) {
       S.bg = { kind: 'image', el: p.img, data: p.data, name: file.name };
     }
     renderVis(); msg('Background set.', 'ok');
-  } catch (e) { msg('That background file could not be opened.', 'err'); }
+  } catch (e) { msg('Could not open that file.', 'err'); }
 }
 function bgSync(jump) {
   const b = S.bg; if (!b || b.kind !== 'video') return;
@@ -1745,7 +1685,7 @@ function lsKeyFor(name) {
 }
 async function setLsImage(track, key, file) {
   try { const p = await shrink(await readAsDataURL(file), 768, 'image/png'); const set = S.ls.get(track) || {}; set[key] = p; S.ls.set(track, set); renderLs(); }
-  catch (e) { msg('That image could not be read.', 'err'); }
+  catch (e) { msg('Could not read that image.', 'err'); }
 }
 function pickLs(track, key) {
   const inp = $('#filePort'); inp.onchange = () => { if (inp.files[0]) setLsImage(track, key, inp.files[0]); inp.value = ''; }; inp.click();
@@ -1866,10 +1806,10 @@ function refreshLines() {
   S.lines2 = (look.lyricText2 || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const info = $('#lyrInfo'); if (!info) return;
   const rows = (look.lyricText || '').split(/\r?\n/).filter(x => x.trim()).length;
-  if (fx.lyrSrc === 'notes') info.textContent = ph.length ? ph.length + ' phrases found in the notes.' : 'No lyrics found in the loaded notes.';
-  else if (UVLyrics.parseLRC(look.lyricText || '').length) info.textContent = S.lines.length + ' timed lines (LRC timestamps in use).';
-  else if (fx.lyrSrc === 'text') info.textContent = rows + ' text lines, ' + ph.length + ' note phrases.' + (rows > ph.length ? ' Lines past the last phrase are not shown.' : '');
-  else info.textContent = rows + ' text lines spread over ' + fmt(S.duration) + '.';
+  if (fx.lyrSrc === 'notes') info.textContent = ph.length ? ph.length + ' phrases.' : 'No lyrics in the notes.';
+  else if (UVLyrics.parseLRC(look.lyricText || '').length) info.textContent = S.lines.length + ' timed lines.';
+  else if (fx.lyrSrc === 'text') info.textContent = rows + ' lines, ' + ph.length + ' phrases.' + (rows > ph.length ? ' Extra lines hidden.' : '');
+  else info.textContent = rows + ' lines over ' + fmt(S.duration) + '.';
 }
 function drawLyricBox(W, H, sc, keysW, P, T) {
   if (!fx.lyrShow || !S.lines.length) return;
@@ -1974,8 +1914,8 @@ function buildEditor() {
     acc('Quick settings', [theme, shade,
       ctl('pitch'), ctl('pitchMode'), ctl('glow'), ctl('highlight'),
       ctl('lyrics'), ctl('lyricSize'),
-      chk('qLyrShow', 'Show the lyric box', () => fx.lyrShow, v => { fx.lyrShow = v; }),
-      chk('qPortShow', 'Show portraits', () => fx.portShow, v => { fx.portShow = v; }),
+      chk('qLyrShow', 'Lyric box', () => fx.lyrShow, v => { fx.lyrShow = v; }),
+      chk('qPortShow', 'Portraits', () => fx.portShow, v => { fx.portShow = v; }),
       ctl('wfStyle'), ctl('window'), ctl('noteH'), ctl('follow'), ctl('pvQ'), ctl('pvLite')], true),
     acc('Lyric box text, note by note', [
       h('p', { class: 'hint', id: 'loHint' }),
@@ -2058,7 +1998,7 @@ $('#fileLyr').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   look.lyricText = (await f.text()).replace(/^﻿/, ''); $('#lyrText').value = look.lyricText;
   if (fx.lyrSrc === 'notes') { fx.lyrSrc = UVLyrics.parseLRC(look.lyricText).length ? 'even' : 'text'; $('#lyrSrc').value = fx.lyrSrc; }
-  fx.lyrShow = true; syncVisInputs(); save(); refreshLines(); msg('Lyrics loaded from ' + f.name + '.', 'ok');
+  fx.lyrShow = true; syncVisInputs(); save(); refreshLines(); msg('Lyrics loaded.', 'ok');
 });
 
 // export shape and range
@@ -2087,7 +2027,7 @@ $('#themeSave').addEventListener('click', async () => {
   if (other) { doc[look.shade === 'light' ? 'light' : 'dark'] = cv_; doc[look.shade === 'light' ? 'dark' : 'light'] = other; } else doc[S.P.light ? 'light' : 'dark'] = cv_;
   doc.fx = o;
   try { await saveBlobAs(new Blob([JSON.stringify(doc, null, 1)], { type: 'application/json' }), name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + '.utatheme.json'); msg('Theme saved.', 'ok'); }
-  catch (e) { if (!(e && e.code === 'declined')) msg('The theme file could not be saved.', 'err'); }
+  catch (e) { if (!(e && e.code === 'declined')) msg('Could not save the theme.', 'err'); }
 });
 $('#themeLoad').addEventListener('click', () => $('#fileTheme').click());
 $('#fileTheme').addEventListener('change', async e => {
@@ -2099,7 +2039,7 @@ $('#fileTheme').addEventListener('change', async e => {
     const name = registerTheme(String(d.name || f.name.replace(/\.utatheme\.json$|\.json$/i, '') || 'Imported theme').slice(0, 40), P);
     if (d.dark && !d.light) look.shade = 'dark'; else if (d.light && !d.dark) look.shade = 'light';
     applyPreset(name); msg('Theme "' + name + '" added.', 'ok'); $('#themeName').value = name;
-  } catch (er) { msg('That is not a UtaViewer theme file.', 'err'); }
+  } catch (er) { msg('Not a theme file.', 'err'); }
 });
 $('#themeRemove').addEventListener('click', () => { const n = look.preset; if (!look.themes[n]) return; delete look.themes[n]; delete PRESETS[n]; applyPreset('Default'); msg('Theme removed.', 'ok'); });
 
@@ -2132,7 +2072,7 @@ function loopPoint(which) {
 }
 function toggleLoop() {
   const l = S.loop;
-  if (l.a == null) { msg('Shift-drag on the timeline, or press [ and ] to mark the loop.'); return; }
+  if (l.a == null) { msg('Shift-drag the timeline, or press [ and ].'); return; }
   l.on = !l.on; syncLoopUI();
 }
 function clearLoop() { S.loop.a = S.loop.b = null; S.loop.on = false; syncLoopUI(); }
@@ -2153,8 +2093,8 @@ tlBody.addEventListener('pointerup', () => { if (loopDrag == null) return; loopD
 function syncBgMode() {
   syncMethod();
   $('#bgMode').value = look.bgMode; cv.classList.toggle('alpha', look.bgMode === 'alpha');
-  $('#bgHint').textContent = look.bgMode === 'alpha' ? 'Saved as WebM with a transparent background. Turn off Piano keys in Effects if you only want the notes. Use an editor that reads alpha, like Premiere, DaVinci Resolve or AviUtl2 with a WebM plugin.'
-    : look.bgMode === 'green' ? 'Fills the video with pure green (#00ff00) so you can key it out in any editor.' : '';
+  $('#bgHint').textContent = look.bgMode === 'alpha' ? 'WebM with alpha. Turn off Piano keys for notes only.'
+    : look.bgMode === 'green' ? 'Pure green (#00ff00) to key out.' : '';
 }
 $('#bgMode').addEventListener('change', e => { look.bgMode = e.target.value; save(); syncBgMode(); });
 
@@ -2175,7 +2115,7 @@ function addToQueue(list) {
   }
   const orphans = S.queue.filter(q => !q.proj); S.queue = S.queue.filter(q => q.proj);
   renderQueue();
-  if (orphans.length) msg('Audio without a project of the same name was skipped: ' + orphans.map(o => o.audio.name).join(', '), 'err');
+  if (orphans.length) msg('Skipped audio with no project: ' + orphans.map(o => o.audio.name).join(', '), 'err');
 }
 function renderQueue() {
   const box = $('#queueList'); box.replaceChildren();
@@ -2207,7 +2147,7 @@ async function runQueue() {
     } catch (e) { q.state = 'error'; if (e && e.code === 'declined') { S.qstop = true; } }
   }
   look.auto = auto0; look.caption = cap0; S.qrun = false;
-  $('#qState').textContent = S.qstop ? 'Stopped after ' + ok + ' of ' + S.queue.length + '.' : 'Done: ' + ok + ' of ' + S.queue.length + ' saved.';
+  $('#qState').textContent = S.qstop ? 'Stopped at ' + ok + ' of ' + S.queue.length + '.' : 'Done: ' + ok + ' of ' + S.queue.length + ' saved.';
   renderQueue(); msg('Queue finished.', ok === S.queue.length ? 'ok' : 'err');
 }
 $('#qAdd').addEventListener('click', () => $('#fileQueue').click());
@@ -2245,7 +2185,7 @@ $('#btnTips').addEventListener('click', () => { tipsOn = !tipsOn; try { localSto
 for (const [sel, text] of STATIC_TIPS) document.querySelectorAll(sel).forEach(el => { el.dataset.tip = text; el.removeAttribute('title'); });
 syncTipsBtn();
 updateP(); setSize(); buildFx(); buildLsCtl(); buildEditor(); buildColorUI(); buildPresets(); syncShade(); recalc(); renderProjects(); setPlayIcon(); syncColorInputs(); syncVisInputs(); syncAspect(); syncBgMode(); renderQueue(); $('#autoStyle').checked = !!look.auto;
-msg('Add project files or drop them on the preview to begin. Only UST files layer together.');
+msg('Drop project files to begin. Only UST files layer.');
 try { const p = window.claude && window.claude.use ? window.claude.use('downloads') : null; if (p) p.then(d => { S.dl = d; }).catch(() => {}); } catch (e) {}
 requestAnimationFrame(loop);
 // test hook, only with ?test in the address
