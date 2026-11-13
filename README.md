@@ -67,7 +67,7 @@ To run the web version yourself, open `index.html` or serve the folder with any 
 
 ## AI-assisted code
 
-UtaViewer contains AI-assisted code. The idea, design, direction and testing are by ryderflyder, and much of the code was written with the help of Claude, an AI assistant made by Anthropic. If you find a bug, please report it.
+UtaViewer contains AI-assisted code. All testing and verification is performed by human testers.
 
 ## Credits
 
